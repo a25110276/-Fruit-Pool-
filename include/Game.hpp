@@ -26,4 +26,25 @@ private:
 
     // Constante de conversión: 30 píxeles equivalen a 1 metro físico
     const float SCALE = 30.0f;
+
+// --- Assets Visuales ---
+sf::Texture m_tableTexture;
+sf::Texture m_cocoTexture;
+sf::Sprite m_tableSprite;
+sf::Sprite m_cocoSprite;
+
+// --- Lógica de Animación ---
+int m_currentFrame = 0;
+float m_frameTime = 0.0f;
+sf::Clock m_animClock;
+
+    // --- Configuración del Spritesheet del Coco ---
+const int FRAME_WIDTH = 100;  // Ancho de un solo frame
+const int FRAME_HEIGHT = 100; // Alto de un solo frame
+const int TOTAL_FRAMES = 35;  // Total de cuadros en la imagen
+const int COLUMNS = 7;        // 700 px totales / 100 px por frame
+
+// Nuevas funciones
+void loadAssets();
+void updateAnimation();
 };

@@ -3,6 +3,7 @@
 
 Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 2") {
     m_window.setFramerateLimit(60);
+    loadAssets();
     initPhysics();
 }
 
@@ -95,6 +96,7 @@ void Game::processEvents() {
 
 void Game::update() {
     // Calculamos el siguiente frame físico
+    updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
 }
 
@@ -112,13 +114,12 @@ void Game::render() {
     // Imprimimos coordenadas en la terminal
     std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
     
-    // Dibujamos el círculo en la pantalla
-    sf::CircleShape visualBall(15.0f);
-    visualBall.setFillColor(sf::Color::White);
-    visualBall.setOrigin(15.0f, 15.0f); 
-    visualBall.setPosition(pixelX, pixelY);
+  m_window.clear();
+m_window.draw(m_tableSprite); // Primero el fondo
+m_window.draw(m_cocoSprite);  // Luego las frutas
+
     
-    m_window.draw(visualBall);
+   
 
     // NUEVO: Dibujar la línea de dirección si el jugador está apuntando
     if (m_isAiming) {
@@ -155,4 +156,58 @@ void Game::createWall(float x, float y, float width, float height) {
     shapeDef.restitution = 0.6f; // Esto simula el rebote elástico de las bandas de billar
 
     b2CreatePolygonShape(wallId, &shapeDef, &box);
+}
+
+void Game::loadAssets() {
+    // 1. Cargar el Mantel
+    if (!m_tableTexture.loadFromFile("assets/images/mantel.jpg")) {
+        // Manejo de error básico
+    }
+    m_tableSprite.setTexture(m_tableTexture);
+
+    // 2. Cargar el Spritesheet del Coco
+    if (!m_cocoTexture.loadFromFile("assets/images/coco.png")) {
+        // Manejo de error básico
+    }
+    m_cocoSprite.setTexture(m_cocoTexture);
+
+    // 3. Configurar el primer recorte (Frame 0)
+    m_cocoSprite.setTextureRect(sf::IntRect({0, 0}, {FRAME_WIDTH, FRAME_HEIGHT}));
+    
+    // 4. Centrar el origen de la imagen en su centro exacto (50, 50)
+    m_cocoSprite.setOrigin({FRAME_WIDTH / 2.0f, FRAME_HEIGHT / 2.0f});
+    
+    // 5. Escalar visualmente al tamaño del cuerpo físico de Box2D
+    // Diámetro físico (30.0f) / Tamaño del frame en píxeles (100.0f) = Escala de 0.3f
+    m_cocoSprite.setScale({30.0f / FRAME_WIDTH, 30.0f / FRAME_HEIGHT});
+}
+void Game::updateAnimation() {
+    b2Vec2 velocity = b2Body_GetLinearVelocity(m_cueBallId);
+    float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+
+    if (speed > 0.5f) {
+        float deltaTime = m_animClock.restart().asSeconds();
+        m_frameTime += deltaTime;
+
+        // Cambiar de frame cada 0.05 segundos (ajústalo si la animación va muy rápido/lento)
+        if (m_frameTime >= 0.05f) {
+            m_currentFrame = (m_currentFrame + 1) % TOTAL_FRAMES;
+
+            // Calcular en qué fila y columna está el frame actual
+            int row = m_currentFrame / COLUMNS;
+            int col = m_currentFrame % COLUMNS;
+
+            // Aplicar el nuevo recorte
+            m_cocoSprite.setTextureRect(sf::IntRect({col * FRAME_WIDTH, row * FRAME_HEIGHT}, {FRAME_WIDTH, FRAME_HEIGHT}));
+            m_frameTime = 0.0f;
+        }
+    } else {
+        m_animClock.restart();
+    }
+
+    // Sincronizar posición con Box2D
+b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
+    float SCALE = 30.0f; // Nuestra constante de conversión
+    
+    m_cocoSprite.setPosition({pos.x * SCALE, pos.y * SCALE});
 }
