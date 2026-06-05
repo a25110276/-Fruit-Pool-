@@ -13,7 +13,11 @@ private:
     void update();
     void render();
     void initPhysics();
-
+    // NUEVO: Función modular para crear muros invisibles
+    void createWall(float x, float y, float width, float height);
+    
+    bool m_isAiming = false;// Variables para la mecánica del taco
+    sf::Vector2f m_mouseStartPos;
     sf::RenderWindow m_window;
     
     // En Box2D v3, usamos "IDs" en lugar de punteros a clases
