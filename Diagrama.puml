@@ -1,0 +1,52 @@
+@startuml Fruitpool
+
+class Usuario {
+
+}
+class Fruta {
+
+}
+
+class Coco
+class Sandia 
+
+class Naranja
+class Mandarina
+class Limon
+class Lima
+class Kiwi
+class LimonAmarillo
+class Toronja
+class granada
+
+class fresas
+class UvaVerde
+class UvaMorada
+class Cereza
+class MoraAzul
+class MoraNegra
+class Frambuesa
+class Estrella
+
+Coco --|> Fruta
+Sandia --|> Fruta
+Naranja --|> Fruta
+Mandarina --|> Fruta  
+Limon --|> Fruta
+Lima --|> Fruta
+Kiwi --|> Fruta
+LimonAmarillo --|> Fruta
+Toronja --|> Fruta
+granada --|> Fruta
+fresa --|> Fruta
+UvaVerde --|> Fruta
+UvaMorada --|> Fruta
+Cereza --|> Fruta
+MoraAzul --|> Fruta
+MoraNegra --|> Fruta
+Frambuesa --|> Fruta
+Estrella --|> Fruta
+
+
+
+@enduml
