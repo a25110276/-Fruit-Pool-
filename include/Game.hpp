@@ -1,7 +1,7 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <box2d/box2d.h>
-
+#include <vector>
 class Game {
 public:
     Game();
@@ -13,6 +13,11 @@ private:
     void update();
     void render();
     void initPhysics();
+
+// --- Variables del Triángulo de Frutas ---
+std::vector<b2BodyId> m_fruitIds;
+void spawnTriangle();
+
     // NUEVO: Función modular para crear muros invisibles
     void createWall(float x, float y, float width, float height);
     

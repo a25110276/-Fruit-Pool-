@@ -1,10 +1,11 @@
 #include "Game.hpp"
 #include <iostream> // Para imprimir en consola
 
-Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 2") {
+Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 4") {
     m_window.setFramerateLimit(60);
     loadAssets();
-    initPhysics();
+    initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
+    spawnTriangle(); // Llenamos la mesa con el triángulo de frutas al iniciar
 }
 
 Game::~Game() {
@@ -118,41 +119,61 @@ void Game::render() {
 m_window.draw(m_tableSprite); // Primero el fondo
 m_window.draw(m_cocoSprite);  // Luego las frutas
 
-    
+    // Dibuja el resto de las frutas de la mesa
+float SCALE = 30.0f;
+for (b2BodyId id : m_fruitIds) {
+    b2Vec2 pos = b2Body_GetPosition(id);
+    m_cocoSprite.setPosition({pos.x * SCALE, pos.y * SCALE});
+    m_cocoSprite.setColor(sf::Color(255, 100, 100)); // Teñirlas de rojo (Test visual)
+    m_window.draw(m_cocoSprite);
+}
+
+// Resetear el color para que el Coco original (Bola blanca) se dibuje normal
+m_cocoSprite.setColor(sf::Color::White);
    
-// NUEVO: Dibujar la guía de dirección y el taco si el jugador está apuntando
+// NUEVO: Apuntado avanzado con retroceso y láser grueso
 if (m_isAiming) {
-    // 0. NUEVO: Calcular pixelX y pixelY sincronizados con Box2D
+    // 1. Obtener la posición física central del Coco
     b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
-    float SCALE = 30.0f; // Nuestra constante de conversión a píxeles
+    float SCALE = 30.0f; 
     float pixelX = pos.x * SCALE;
     float pixelY = pos.y * SCALE;
 
-    // 1. Obtenemos la posición actual del mouse
+    // 2. Calcular el vector de "jalón"
     sf::Vector2i currentMousePos = sf::Mouse::getPosition(m_window);
-    
-    // 2. Calculamos el vector de "jalón" (Resortera)
     float pullX = m_mouseStartPos.x - currentMousePos.x;
     float pullY = m_mouseStartPos.y - currentMousePos.y;
 
-    // Calculamos el vector de proyección visual (hacia dónde va a salir)
-    float projX = pixelX + pullX;
-    float projY = pixelY + pullY;
-
-    // 3. Dibujar la Guía de Apuntado (Línea Blanca con SFML 3)
-    sf::Vertex aimLine[] = {
-        sf::Vertex(sf::Vector2f(pixelX, pixelY), sf::Color::White),
-        sf::Vertex(sf::Vector2f(projX, projY), sf::Color(255, 255, 255, 150)) // Blanco semi-transparente
-    };
-    m_window.draw(aimLine, 2, sf::PrimitiveType::Lines);
-
-  // 4. Dibujar el Taco de Billar
-    // Calculamos el ángulo en dirección a tu ratón usando atan2
-    // Usamos -pullY y -pullX para que la "punta" del taco mire hacia el Coco
-    float angle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
+    // 3. Limitar el retroceso máximo de la caña (Clamp)
+    float pullDist = std::sqrt(pullX * pullX + pullY * pullY);
+    float maxPull = 120.0f; // Píxeles máximos que la caña se hará hacia atrás
     
-    m_cueSprite.setPosition({pixelX, pixelY});
-    m_cueSprite.setRotation(angle); // <-- CORRECCIÓN: Compatible con SFML 2.x
+    if (pullDist > maxPull) {
+        pullX = (pullX / pullDist) * maxPull;
+        pullY = (pullY / pullDist) * maxPull;
+    }
+
+    // 4. Dibujar la Guía de Tiro (Línea Gruesa Fija)
+    // El ángulo de tiro va en dirección contraria al jalón del ratón
+    float shotAngle = std::atan2(pullY, pullX) * 180.0f / 3.14159265f;
+
+    sf::RectangleShape aimLine;
+    aimLine.setSize({900.0f, 4.0f}); // 800px de largo fijo, 4px de grosor
+    aimLine.setOrigin({0.0f, 2.0f}); // Centrar el grosor verticalmente
+    aimLine.setPosition({pixelX, pixelY});
+    aimLine.setRotation(shotAngle);
+    aimLine.setFillColor(sf::Color(255, 255, 255, 120)); // Blanco semi-transparente
+    
+    m_window.draw(aimLine);
+
+    // 5. Dibujar la Caña de Azúcar con Retroceso
+    // El ángulo del taco está invertido respecto al tiro
+    float stickAngle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
+    
+    // Restamos pullX y pullY a la posición del Coco para mover el taco hacia atrás
+    m_cueSprite.setPosition({pixelX - pullX, pixelY - pullY});
+    m_cueSprite.setRotation(stickAngle);
+    
     m_window.draw(m_cueSprite);
 }
        m_window.display();
@@ -244,4 +265,49 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
     float SCALE = 30.0f; // Nuestra constante de conversión
     
     m_cocoSprite.setPosition({pos.x * SCALE, pos.y * SCALE});
+}
+
+void Game::spawnTriangle() {
+    float SCALE = 30.0f;
+    float startX = 900.0f / SCALE; // Posición de la primera bola (Ápice del triángulo)
+    float startY = 360.0f / SCALE; // Centro vertical exacto de la pantalla
+    float radius = 15.0f / SCALE;  // Radio físico (Diámetro 30)
+    
+    float diameter = radius * 2.0f;
+    float rowSpacing = diameter * 0.866f; // Ajuste horizontal hexagonal
+
+    // Bucle anidado para crear las 5 filas (1 + 2 + 3 + 4 + 5 = 15 frutas)
+    for (int row = 0; row < 5; ++row) {
+        float firstY = startY - (row * radius); // Desplazamiento Y inicial de cada fila
+
+        for (int col = 0; col <= row; ++col) {
+            float x = startX + (row * rowSpacing);
+            float y = firstY + (col * diameter);
+
+            // 1. Crear el cuerpo físico
+            b2BodyDef bodyDef = b2DefaultBodyDef();
+            bodyDef.type = b2_dynamicBody;
+            bodyDef.position = {x, y};
+            
+            // Fricción de rodadura para que se detengan solas
+            bodyDef.linearDamping = 1.2f; 
+            bodyDef.angularDamping = 1.0f;
+
+            b2BodyId fruitId = b2CreateBody(m_worldId, &bodyDef);
+
+            // 2. Crear la forma y el material de colisión
+            b2Circle circle = {{0.0f, 0.0f}, radius};
+            b2ShapeDef shapeDef = b2DefaultShapeDef();
+            
+            // Propiedades físicas de una bola de billar real
+            shapeDef.restitution = 0.85f; // Mucho rebote
+            shapeDef.friction = 0.2f;     // Poca fricción al raspar
+            shapeDef.density = 1.0f;
+
+            b2CreateCircleShape(fruitId, &shapeDef, &circle);
+
+            // 3. Almacenar el ID en nuestra lista
+            m_fruitIds.push_back(fruitId);
+        }
+    }
 }
