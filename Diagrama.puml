@@ -3,6 +3,8 @@
 class Usuario {
 
 }
+class bola 
+
 class Fruta {
 
 }
@@ -47,6 +49,7 @@ MoraNegra --|> Fruta
 Frambuesa --|> Fruta
 Estrella --|> Fruta
 
+Fruta --|> bola
 
 
 @enduml

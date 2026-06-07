@@ -120,23 +120,41 @@ m_window.draw(m_cocoSprite);  // Luego las frutas
 
     
    
+// NUEVO: Dibujar la guía de dirección y el taco si el jugador está apuntando
+if (m_isAiming) {
+    // 0. NUEVO: Calcular pixelX y pixelY sincronizados con Box2D
+    b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
+    float SCALE = 30.0f; // Nuestra constante de conversión a píxeles
+    float pixelX = pos.x * SCALE;
+    float pixelY = pos.y * SCALE;
 
-    // NUEVO: Dibujar la línea de dirección si el jugador está apuntando
-    if (m_isAiming) {
-        // Obtenemos la posición actual del mouse en tiempo real
-        sf::Vector2i currentMousePos = sf::Mouse::getPosition(m_window);
-        
-        // Calculamos el vector de proyección visual
-        float projX = pixelX + (m_mouseStartPos.x - currentMousePos.x);
-        float projY = pixelY + (m_mouseStartPos.y - currentMousePos.y);
+    // 1. Obtenemos la posición actual del mouse
+    sf::Vector2i currentMousePos = sf::Mouse::getPosition(m_window);
+    
+    // 2. Calculamos el vector de "jalón" (Resortera)
+    float pullX = m_mouseStartPos.x - currentMousePos.x;
+    float pullY = m_mouseStartPos.y - currentMousePos.y;
 
-        sf::Vertex line[] = {
-            sf::Vertex(sf::Vector2f(pixelX, pixelY), sf::Color::White), // Inicio (Centro del coco)
-            sf::Vertex(sf::Vector2f(projX, projY), sf::Color::Red)      // Fin (Proyección del golpe)
-        };
-        m_window.draw(line, 2, sf::Lines);
-     
-    }
+    // Calculamos el vector de proyección visual (hacia dónde va a salir)
+    float projX = pixelX + pullX;
+    float projY = pixelY + pullY;
+
+    // 3. Dibujar la Guía de Apuntado (Línea Blanca con SFML 3)
+    sf::Vertex aimLine[] = {
+        sf::Vertex(sf::Vector2f(pixelX, pixelY), sf::Color::White),
+        sf::Vertex(sf::Vector2f(projX, projY), sf::Color(255, 255, 255, 150)) // Blanco semi-transparente
+    };
+    m_window.draw(aimLine, 2, sf::PrimitiveType::Lines);
+
+  // 4. Dibujar el Taco de Billar
+    // Calculamos el ángulo en dirección a tu ratón usando atan2
+    // Usamos -pullY y -pullX para que la "punta" del taco mire hacia el Coco
+    float angle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
+    
+    m_cueSprite.setPosition({pixelX, pixelY});
+    m_cueSprite.setRotation(angle); // <-- CORRECCIÓN: Compatible con SFML 2.x
+    m_window.draw(m_cueSprite);
+}
        m_window.display();
 }
 
@@ -180,7 +198,23 @@ void Game::loadAssets() {
     // 5. Escalar visualmente al tamaño del cuerpo físico de Box2D
     // Diámetro físico (30.0f) / Tamaño del frame en píxeles (100.0f) = Escala de 0.3f
     m_cocoSprite.setScale({30.0f / FRAME_WIDTH, 30.0f / FRAME_HEIGHT});
+
+    // 6. Cargar el Taco de Billar
+if (!m_cueTexture.loadFromFile("assets/images/taco.png")) {
+    // Manejo de error básico
 }
+m_cueSprite.setTexture(m_cueTexture);
+
+// Mover el punto de rotación al centro del borde izquierdo (la punta del taco)
+float tacoHeight = static_cast<float>(m_cueTexture.getSize().y);
+m_cueSprite.setOrigin({0.0f, tacoHeight / 2.0f});
+
+// Opcional: Ajustar la escala si tu imagen del taco es muy grande
+m_cueSprite.setScale({0.5f, 0.5f});
+
+
+}
+
 void Game::updateAnimation() {
     b2Vec2 velocity = b2Body_GetLinearVelocity(m_cueBallId);
     float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);

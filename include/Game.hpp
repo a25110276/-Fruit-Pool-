@@ -33,6 +33,10 @@ sf::Texture m_cocoTexture;
 sf::Sprite m_tableSprite;
 sf::Sprite m_cocoSprite;
 
+// --- Assets del Taco ---
+sf::Texture m_cueTexture;
+sf::Sprite m_cueSprite;
+
 // --- Lógica de Animación ---
 int m_currentFrame = 0;
 float m_frameTime = 0.0f;
