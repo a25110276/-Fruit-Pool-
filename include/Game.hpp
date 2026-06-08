@@ -14,6 +14,13 @@ private:
     void render();
     void initPhysics();
 
+    // --- Variables de Troneras ---
+std::vector<b2Vec2> m_pockets;
+float m_pocketRadius;
+
+void initPockets();
+void checkPockets();
+
 // --- Variables del Triángulo de Frutas ---
 std::vector<b2BodyId> m_fruitIds;
 void spawnTriangle();

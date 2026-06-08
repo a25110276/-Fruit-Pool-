@@ -1,11 +1,15 @@
 #include "Game.hpp"
 #include <iostream> // Para imprimir en consola
+#include <cmath>
 
+// NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
 Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 4") {
     m_window.setFramerateLimit(60);
     loadAssets();
     initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
     spawnTriangle(); // Llenamos la mesa con el triángulo de frutas al iniciar
+    initPockets();   // Configuramos las posiciones de las troneras
+
 }
 
 Game::~Game() {
@@ -21,7 +25,7 @@ void Game::initPhysics() {
     // 2. Definir el Coco (Bola blanca dinámica)
     b2BodyDef bodyDef = b2DefaultBodyDef();
     bodyDef.type = b2_dynamicBody;
-    bodyDef.position = {400.0f / SCALE, 360.0f / SCALE}; 
+    bodyDef.position = {385.0f / SCALE, 360.0f / SCALE}; // Posición inicial del Coco
     bodyDef.linearDamping = 1.2f; // Fricción del tapete
     bodyDef.angularDamping = 1.0f;
 
@@ -38,12 +42,14 @@ void Game::initPhysics() {
     shapeDef.restitution = 0.8f; // Rebote
 
     b2CreateCircleShape(m_cueBallId, &shapeDef, &dynamicCircle);
-    // NUEVO: Creamos las 4 bandas de la mesa de billar (Arriba, Abajo, Izquierda, Derecha)
-    // Coordenadas: Centro X, Centro Y, Ancho total, Alto total
-    createWall(640.0f, 0.0f, 1280.0f, 20.0f);   // Pared Superior
-    createWall(640.0f, 720.0f, 1280.0f, 20.0f); // Pared Inferior
-    createWall(0.0f, 360.0f, 20.0f, 720.0f);    // Pared Izquierda
-    createWall(1280.0f, 360.0f, 20.0f, 720.0f); // Pared Derecha
+
+    // NUEVO: Creamos las 4 bandas de la mesa de billar centradas
+// Coordenadas: Centro X, Centro Y, Ancho total, Alto total
+createWall(640.0f, 105.0f, 1020.0f, 20.0f); // Pared Superior
+createWall(640.0f, 615.0f, 1020.0f, 20.0f); // Pared Inferior
+createWall(130.0f, 360.0f, 20.0f, 510.0f);  // Pared Izquierda
+createWall(1150.0f, 360.0f, 20.0f, 510.0f); // Pared Derecha
+
 }
 
 void Game::run() {
@@ -99,25 +105,41 @@ void Game::update() {
     // Calculamos el siguiente frame físico
     updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
+    checkPockets();
+    
 }
 
 void Game::render() {
+
+
     // Limpiamos la ventana (color azul de mesa)
     m_window.clear(sf::Color(20, 80, 150));
     
     // Obtenemos la posición física
-    b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
+    //b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
     
     // Convertimos a píxeles
-    float pixelX = pos.x * SCALE;
-    float pixelY = pos.y * SCALE;
+   // float pixelX = pos.x * SCALE;
+   // float pixelY = pos.y * SCALE;
 
     // Imprimimos coordenadas en la terminal
-    std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
+   // std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
     
   m_window.clear();
 m_window.draw(m_tableSprite); // Primero el fondo
 m_window.draw(m_cocoSprite);  // Luego las frutas
+
+// --- DEBUG: Dibujo de Troneras Provisionales ---
+for (const auto& pocket : m_pockets) {
+    sf::CircleShape debugPocket(m_pocketRadius * 30.0f); // Multiplicamos por la escala
+    debugPocket.setOrigin(m_pocketRadius * 30.0f, m_pocketRadius * 30.0f);
+    
+    // Aquí es la clave: La posición del pocket es la misma que la física
+    debugPocket.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
+    
+    debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
+    m_window.draw(debugPocket);
+}
 
     // Dibuja el resto de las frutas de la mesa
 float SCALE = 30.0f;
@@ -177,6 +199,7 @@ if (m_isAiming) {
     m_window.draw(m_cueSprite);
 }
        m_window.display();
+       
 }
 
 void Game::createWall(float x, float y, float width, float height) {
@@ -203,6 +226,18 @@ void Game::loadAssets() {
         // Manejo de error básico
     }
     m_tableSprite.setTexture(m_tableTexture);
+    //================cambios para centrar el mantel y escalarlo del mantel 
+    // 1. Configurar el origen del mantel al centro de la imagen (640, 360)
+// Asumiendo que tu mantel mide 1280x720, el centro es 640, 360.
+m_tableSprite.setOrigin(640.0f, 360.0f); 
+
+// 2. Posicionar el mantel exactamente en el centro de la ventana
+m_tableSprite.setPosition(640.0f, 360.0f);
+
+// 3. Si tu mantel es más grande que la mesa, escala el sprite:
+// 1020 es tu ancho de mesa, 1280 es el ancho de imagen
+m_tableSprite.setScale(1020.0f / 1280.0f, 510.0f / 720.0f);
+
 
     // 2. Cargar el Spritesheet del Coco
     if (!m_cocoTexture.loadFromFile("assets/images/coco.png")) {
@@ -218,7 +253,7 @@ void Game::loadAssets() {
     
     // 5. Escalar visualmente al tamaño del cuerpo físico de Box2D
     // Diámetro físico (30.0f) / Tamaño del frame en píxeles (100.0f) = Escala de 0.3f
-    m_cocoSprite.setScale({30.0f / FRAME_WIDTH, 30.0f / FRAME_HEIGHT});
+    m_cocoSprite.setScale({34.0f / FRAME_WIDTH, 34.0f / FRAME_HEIGHT});
 
     // 6. Cargar el Taco de Billar
 if (!m_cueTexture.loadFromFile("assets/images/taco.png")) {
@@ -268,46 +303,114 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
 }
 
 void Game::spawnTriangle() {
+    // Inicio del triángulo
     float SCALE = 30.0f;
-    float startX = 900.0f / SCALE; // Posición de la primera bola (Ápice del triángulo)
-    float startY = 360.0f / SCALE; // Centro vertical exacto de la pantalla
-    float radius = 15.0f / SCALE;  // Radio físico (Diámetro 30)
+    float startX = 895.0f / SCALE;
+    float startY = 360.0f / SCALE;
+    float radius = 15.0f / SCALE;  // Radio físico real
     
-    float diameter = radius * 2.0f;
-    float rowSpacing = diameter * 0.866f; // Ajuste horizontal hexagonal
+    // 1. EL SECRETO DEL BILLAR VIRTUAL: Un micro-espacio
+    float gap = 0.05f / SCALE; // Un hueco invisible de 0.05 píxeles
+    float effectiveRadius = radius + gap; 
+    float effectiveDiameter = effectiveRadius * 2.0f;
+    
+    // 2. Fórmula matemática exacta para la separación de un hexágono/triángulo
+    float rowSpacing = effectiveDiameter * std::sqrt(3.0f) / 2.0f;
 
-    // Bucle anidado para crear las 5 filas (1 + 2 + 3 + 4 + 5 = 15 frutas)
     for (int row = 0; row < 5; ++row) {
-        float firstY = startY - (row * radius); // Desplazamiento Y inicial de cada fila
+        // Calculamos el centro exacto en Y para cada columna
+        float firstY = startY - (row * effectiveRadius); 
 
         for (int col = 0; col <= row; ++col) {
             float x = startX + (row * rowSpacing);
-            float y = firstY + (col * diameter);
+            float y = firstY + (col * effectiveDiameter);
 
-            // 1. Crear el cuerpo físico
             b2BodyDef bodyDef = b2DefaultBodyDef();
             bodyDef.type = b2_dynamicBody;
             bodyDef.position = {x, y};
             
-            // Fricción de rodadura para que se detengan solas
             bodyDef.linearDamping = 1.2f; 
             bodyDef.angularDamping = 1.0f;
 
             b2BodyId fruitId = b2CreateBody(m_worldId, &bodyDef);
 
-            // 2. Crear la forma y el material de colisión
-            b2Circle circle = {{0.0f, 0.0f}, radius};
+            // La forma física se mantiene en su radio original para que la física sea leal
+            b2Circle circle = {{0.0f, 0.0f}, radius}; 
             b2ShapeDef shapeDef = b2DefaultShapeDef();
             
-            // Propiedades físicas de una bola de billar real
-            shapeDef.restitution = 0.85f; // Mucho rebote
-            shapeDef.friction = 0.2f;     // Poca fricción al raspar
+            shapeDef.restitution = 0.85f; 
+            shapeDef.friction = 0.2f;     
             shapeDef.density = 1.0f;
 
             b2CreateCircleShape(fruitId, &shapeDef, &circle);
 
-            // 3. Almacenar el ID en nuestra lista
             m_fruitIds.push_back(fruitId);
         }
     }
 }
+
+void Game::initPockets() {
+    float SCALE = 30.0f; 
+    m_pockets.clear();
+
+    m_pocketRadius = 35.0f / SCALE; // Radio de atracción del agujero
+
+    // Troneras Superiores (Y = 105)
+    m_pockets.push_back({130.0f / SCALE, 105.0f / SCALE});   // Izquierda
+    m_pockets.push_back({640.0f / SCALE, 105.0f / SCALE});   // Centro
+    m_pockets.push_back({1150.0f / SCALE, 105.0f / SCALE});  // Derecha
+
+    // Troneras Inferiores (Y = 615)
+    m_pockets.push_back({130.0f / SCALE, 615.0f / SCALE});   // Izquierda
+    m_pockets.push_back({640.0f / SCALE, 615.0f / SCALE});   // Centro
+    m_pockets.push_back({1150.0f / SCALE, 615.0f / SCALE});  // Derecha
+}
+
+void Game::checkPockets() {
+    float SCALE = 30.0f;
+    float dropDistSq = m_pocketRadius * m_pocketRadius; // Distancia al cuadrado
+
+    // 1. Revisar las frutas (Lisas y Rayadas)
+    for (auto it = m_fruitIds.begin(); it != m_fruitIds.end(); ) {
+        b2Vec2 pos = b2Body_GetPosition(*it);
+        bool pocketed = false;
+
+        for (const auto& pocket : m_pockets) {
+            float dx = pos.x - pocket.x;
+            float dy = pos.y - pocket.y;
+            
+            // Si la distancia al cuadrado es menor que el radio de caída al cuadrado
+            if ((dx * dx + dy * dy) < dropDistSq) {
+                pocketed = true;
+                break;
+            }
+        }
+
+        if (pocketed) {
+            // Destruir el cuerpo físico en Box2D
+            b2DestroyBody(*it);
+            // Quitarlo de nuestra lista para no dibujarlo más
+            it = m_fruitIds.erase(it); 
+        } else {
+            ++it;
+        }
+    }
+
+    // 2. Revisar la bola blanca (El Coco)
+    b2Vec2 cuePos = b2Body_GetPosition(m_cueBallId);
+    for (const auto& pocket : m_pockets) {
+        float dx = cuePos.x - pocket.x;
+        float dy = cuePos.y - pocket.y;
+        
+        if ((dx * dx + dy * dy) < dropDistSq) {
+            // ¡Falta! El Coco entró a la tronera. 
+            // Detenemos su movimiento y lo regresamos al punto de saque.
+            b2Body_SetLinearVelocity(m_cueBallId, {0.0f, 0.0f});
+            b2Body_SetAngularVelocity(m_cueBallId, 0.0f);
+            b2Body_SetTransform(m_cueBallId, {385.0f / SCALE, 360.0f / SCALE}, b2MakeRot(0.0f));
+            break; // Romper el ciclo porque ya sabemos que cayó
+        }
+    }
+   
+}
+
