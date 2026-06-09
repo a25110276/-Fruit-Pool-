@@ -47,10 +47,10 @@ void Game::initPhysics() {
 float wallThickness = 60.0f;
 
 // Horizontales (superior e inferior, divididas en 2 segmentos)
-createWall(370.0f, 75.0f, 480.0f, wallThickness);  // Superior izquierda
-createWall(910.0f, 75.0f, 480.0f, wallThickness);  // Superior derecha
-createWall(370.0f, 645.0f, 480.0f, wallThickness); // Inferior izquierda
-createWall(910.0f, 645.0f, 480.0f, wallThickness); // Inferior derecha
+createWall(385.0f, 75.0f, 450.0f, wallThickness);  // Superior izquierda
+createWall(895.0f, 75.0f, 450.0f, wallThickness);  // Superior derecha
+createWall(385.0f, 645.0f, 450.0f, wallThickness); // Inferior izquierda
+createWall(895.0f, 645.0f, 450.0f, wallThickness); // Inferior derecha
 
 // Verticales (izquierda y derecha, completas pero recortadas arriba/abajo)
 createWall(100.0f, 360.0f, wallThickness, 450.0f); // Izquierda
@@ -135,18 +135,6 @@ void Game::render() {
 m_window.draw(m_tableSprite); // Primero el fondo
 m_window.draw(m_cocoSprite);  // Luego las frutas
 
-// --- DEBUG: Dibujo de Troneras Provisionales ---
-for (const auto& pocket : m_pockets) {
-    sf::CircleShape debugPocket(m_pocketRadius * 30.0f); // Multiplicamos por la escala
-    debugPocket.setOrigin(m_pocketRadius * 30.0f, m_pocketRadius * 30.0f);
-    
-    // Aquí es la clave: La posición del pocket es la misma que la física
-    debugPocket.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
-    
-    debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
-    m_window.draw(debugPocket);
-}
-
 // --- NUEVO: Renderizado visual de las bandas de la mesa ---
 float wallThickness = 60.0f; // Asegúrate de que este valor coincida con tu física
 
@@ -171,6 +159,18 @@ for (const auto& w : walls) {
     rect.setPosition(w.x, w.y);
     rect.setFillColor(verdeColor);
     m_window.draw(rect);
+}
+
+// --- DEBUG: Dibujo de Troneras Provisionales ---
+for (const auto& pocket : m_pockets) {
+    sf::CircleShape debugPocket(m_pocketRadius * 30.0f); // Multiplicamos por la escala
+    debugPocket.setOrigin(m_pocketRadius * 30.0f, m_pocketRadius * 30.0f);
+    
+    // Aquí es la clave: La posición del pocket es la misma que la física
+    debugPocket.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
+    
+    debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
+    m_window.draw(debugPocket);
 }
 
 
@@ -389,14 +389,14 @@ void Game::initPockets() {
     m_pocketRadius = 30.0f / SCALE; // Radio de atracción del agujero
 
     // Troneras Superiores (Y = 105)
-    m_pockets.push_back({130.0f / SCALE, 105.0f / SCALE});   // Izquierda
-    m_pockets.push_back({640.0f / SCALE, 105.0f / SCALE});   // Centro
-    m_pockets.push_back({1150.0f / SCALE, 105.0f / SCALE});  // Derecha
+    m_pockets.push_back({100.0f / SCALE, 75.0f / SCALE});   // Izquierda
+    m_pockets.push_back({640.0f / SCALE, 75.0f / SCALE});   // Centro
+    m_pockets.push_back({1180.0f / SCALE, 75.0f / SCALE});  // Derecha
 
     // Troneras Inferiores (Y = 615)
-    m_pockets.push_back({130.0f / SCALE, 615.0f / SCALE});   // Izquierda
-    m_pockets.push_back({640.0f / SCALE, 615.0f / SCALE});   // Centro
-    m_pockets.push_back({1150.0f / SCALE, 615.0f / SCALE});  // Derecha
+    m_pockets.push_back({100.0f / SCALE, 645.0f / SCALE});   // Izquierda
+    m_pockets.push_back({640.0f / SCALE, 645.0f / SCALE});   // Centro
+    m_pockets.push_back({1180.0f / SCALE, 645.0f / SCALE});  // Derecha
 }
 
 void Game::checkPockets() {
