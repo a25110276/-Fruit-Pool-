@@ -38,17 +38,24 @@ void Game::initPhysics() {
 
     b2ShapeDef shapeDef = b2DefaultShapeDef();
     shapeDef.density = 1.0f; 
-    shapeDef.friction = 0.2f;
+    shapeDef.friction = 0.1f;
     shapeDef.restitution = 0.8f; // Rebote
 
     b2CreateCircleShape(m_cueBallId, &shapeDef, &dynamicCircle);
+// Grosor de las bandas
 
-    // NUEVO: Creamos las 4 bandas de la mesa de billar centradas
-// Coordenadas: Centro X, Centro Y, Ancho total, Alto total
-createWall(640.0f, 105.0f, 1020.0f, 20.0f); // Pared Superior
-createWall(640.0f, 615.0f, 1020.0f, 20.0f); // Pared Inferior
-createWall(130.0f, 360.0f, 20.0f, 510.0f);  // Pared Izquierda
-createWall(1150.0f, 360.0f, 20.0f, 510.0f); // Pared Derecha
+float wallThickness = 60.0f;
+
+// Horizontales (superior e inferior, divididas en 2 segmentos)
+createWall(370.0f, 75.0f, 480.0f, wallThickness);  // Superior izquierda
+createWall(910.0f, 75.0f, 480.0f, wallThickness);  // Superior derecha
+createWall(370.0f, 645.0f, 480.0f, wallThickness); // Inferior izquierda
+createWall(910.0f, 645.0f, 480.0f, wallThickness); // Inferior derecha
+
+// Verticales (izquierda y derecha, completas pero recortadas arriba/abajo)
+createWall(100.0f, 360.0f, wallThickness, 450.0f); // Izquierda
+createWall(1180.0f, 360.0f, wallThickness, 450.0f); // Derecha
+
 
 }
 
@@ -115,11 +122,10 @@ void Game::render() {
     // Limpiamos la ventana (color azul de mesa)
     m_window.clear(sf::Color(20, 80, 150));
     
-    // Obtenemos la posición física
-    //b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
-    
-    // Convertimos a píxeles
-   // float pixelX = pos.x * SCALE;
+// Obtenemos la posición física
+//b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
+// Convertimos a píxeles
+// float pixelX = pos.x * SCALE;
    // float pixelY = pos.y * SCALE;
 
     // Imprimimos coordenadas en la terminal
@@ -140,6 +146,33 @@ for (const auto& pocket : m_pockets) {
     debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
     m_window.draw(debugPocket);
 }
+
+// --- NUEVO: Renderizado visual de las bandas de la mesa ---
+float wallThickness = 60.0f; // Asegúrate de que este valor coincida con tu física
+
+// Definimos un color verde (RGB: 0, 128, 0)
+
+sf::Color verdeColor(0, 128, 0);
+
+// Definimos los datos de las paredes para iterar sobre ellos y simplificar el código
+struct WallRender { float x, y, w, h; };
+std::vector<WallRender> walls = {
+    {385.0f, 75.0f,  450.0f, wallThickness}, // Sup-Izq
+    {895.0f, 75.0f,  450.0f, wallThickness}, // Sup-Der
+    {385.0f, 645.0f, 450.0f, wallThickness}, // Inf-Izq
+    {895.0f, 645.0f, 450.0f, wallThickness}, // Inf-Der
+    {100.0f, 360.0f, wallThickness, 450.0f}, // Izq
+    {1180.0f, 360.0f, wallThickness, 450.0f} // Der
+};
+
+for (const auto& w : walls) {
+    sf::RectangleShape rect({w.w, w.h});
+    rect.setOrigin(w.w / 2.0f, w.h / 2.0f); // Centramos el origen para usar las coordenadas de createWall
+    rect.setPosition(w.x, w.y);
+    rect.setFillColor(verdeColor);
+    m_window.draw(rect);
+}
+
 
     // Dibuja el resto de las frutas de la mesa
 float SCALE = 30.0f;
@@ -353,7 +386,7 @@ void Game::initPockets() {
     float SCALE = 30.0f; 
     m_pockets.clear();
 
-    m_pocketRadius = 35.0f / SCALE; // Radio de atracción del agujero
+    m_pocketRadius = 30.0f / SCALE; // Radio de atracción del agujero
 
     // Troneras Superiores (Y = 105)
     m_pockets.push_back({130.0f / SCALE, 105.0f / SCALE});   // Izquierda
