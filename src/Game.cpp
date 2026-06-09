@@ -131,9 +131,10 @@ void Game::render() {
     // Imprimimos coordenadas en la terminal
    // std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
     
-  m_window.clear();
-m_window.draw(m_tableSprite); // Primero el fondo
-m_window.draw(m_cocoSprite);  // Luego las frutas
+    // Dibujar el fondo primero, luego el mantel y los demás elementos
+    m_window.draw(m_backgroundSprite);
+    m_window.draw(m_tableSprite);
+    m_window.draw(m_cocoSprite);  // Luego las frutas
 
 // --- NUEVO: Renderizado visual de las bandas de la mesa ---
 float wallThickness = 60.0f; // Asegúrate de que este valor coincida con tu física
@@ -254,7 +255,16 @@ void Game::createWall(float x, float y, float width, float height) {
 }
 
 void Game::loadAssets() {
-    // 1. Cargar el Mantel
+    // 1. Cargar el Fondo
+    bool backgroundLoaded = m_backgroundTexture.loadFromFile("assets/images/fondo.png");
+    if (backgroundLoaded) {
+        m_backgroundSprite.setTexture(m_backgroundTexture);
+        m_backgroundSprite.setOrigin({m_backgroundTexture.getSize().x / 2.0f, m_backgroundTexture.getSize().y / 2.0f});
+        m_backgroundSprite.setPosition({640.0f, 360.0f});
+        m_backgroundSprite.setScale({1280.0f / m_backgroundTexture.getSize().x, 720.0f / m_backgroundTexture.getSize().y});
+    }
+
+    // 2. Cargar el Mantel
     if (!m_tableTexture.loadFromFile("assets/images/mantel.jpg")) {
         // Manejo de error básico
     }
@@ -272,7 +282,7 @@ m_tableSprite.setPosition(640.0f, 360.0f);
 m_tableSprite.setScale(1020.0f / 1280.0f, 510.0f / 720.0f);
 
 
-    // 2. Cargar el Spritesheet del Coco
+    // 3. Cargar el Spritesheet del Coco
     if (!m_cocoTexture.loadFromFile("assets/images/coco.png")) {
         // Manejo de error básico
     }

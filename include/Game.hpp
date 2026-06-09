@@ -1,3 +1,4 @@
+
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <box2d/box2d.h>
@@ -40,6 +41,8 @@ void spawnTriangle();
     const float SCALE = 30.0f;
 
 // --- Assets Visuales ---
+sf::Texture m_backgroundTexture;
+sf::Sprite m_backgroundSprite;
 sf::Texture m_tableTexture;
 sf::Texture m_cocoTexture;
 sf::Sprite m_tableSprite;
