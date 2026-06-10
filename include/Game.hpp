@@ -43,6 +43,8 @@ void spawnTriangle();
 // --- Assets Visuales ---
 sf::Texture m_backgroundTexture;
 sf::Sprite m_backgroundSprite;
+sf::Texture m_frameTexture;
+sf::Sprite m_frameSprite;
 sf::Texture m_tableTexture;
 sf::Texture m_cocoTexture;
 sf::Sprite m_tableSprite;

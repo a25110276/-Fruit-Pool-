@@ -131,36 +131,11 @@ void Game::render() {
     // Imprimimos coordenadas en la terminal
    // std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
     
-    // Dibujar el fondo primero, luego el mantel y los demás elementos
+    // Dibujar el fondo primero, luego el mantel atrás del marco y después las frutas
     m_window.draw(m_backgroundSprite);
-    m_window.draw(m_tableSprite);
-    m_window.draw(m_cocoSprite);  // Luego las frutas
-
-// --- NUEVO: Renderizado visual de las bandas de la mesa ---
-float wallThickness = 60.0f; // Asegúrate de que este valor coincida con tu física
-
-// Definimos un color verde (RGB: 0, 128, 0)
-
-sf::Color verdeColor(0, 128, 0);
-
-// Definimos los datos de las paredes para iterar sobre ellos y simplificar el código
-struct WallRender { float x, y, w, h; };
-std::vector<WallRender> walls = {
-    {385.0f, 75.0f,  450.0f, wallThickness}, // Sup-Izq
-    {895.0f, 75.0f,  450.0f, wallThickness}, // Sup-Der
-    {385.0f, 645.0f, 450.0f, wallThickness}, // Inf-Izq
-    {895.0f, 645.0f, 450.0f, wallThickness}, // Inf-Der
-    {100.0f, 360.0f, wallThickness, 450.0f}, // Izq
-    {1180.0f, 360.0f, wallThickness, 450.0f} // Der
-};
-
-for (const auto& w : walls) {
-    sf::RectangleShape rect({w.w, w.h});
-    rect.setOrigin(w.w / 2.0f, w.h / 2.0f); // Centramos el origen para usar las coordenadas de createWall
-    rect.setPosition(w.x, w.y);
-    rect.setFillColor(verdeColor);
-    m_window.draw(rect);
-}
+    m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
+    m_window.draw(m_frameSprite);   // Marco encima del mantel
+    m_window.draw(m_cocoSprite);    // Luego las frutas
 
 // --- DEBUG: Dibujo de Troneras Provisionales ---
 for (const auto& pocket : m_pockets) {
@@ -308,25 +283,30 @@ void Game::loadAssets() {
         m_backgroundSprite.setScale({1280.0f / m_backgroundTexture.getSize().x, 720.0f / m_backgroundTexture.getSize().y});
     }
 
+    // 1.5. Cargar el Marco
+    if (!m_frameTexture.loadFromFile("assets/images/marco.png")) {
+        // Manejo de error básico
+    }
+    m_frameSprite.setTexture(m_frameTexture);
+    // Configurar el origen del marco al centro de la imagen
+    m_frameSprite.setOrigin(m_frameTexture.getSize().x / 2.0f, m_frameTexture.getSize().y / 2.0f);
+    // Posicionar el marco exactamente en el centro de la ventana (mismo que el mantel)
+    m_frameSprite.setPosition(640.0f, 360.0f);
+    // No escalamos el marco, se dibuja en su tamaño original (1194x683)
+
     // 2. Cargar el Mantel
     if (!m_tableTexture.loadFromFile("assets/images/mantel.jpg")) {
         // Manejo de error básico
     }
     m_tableSprite.setTexture(m_tableTexture);
-    //================cambios para centrar el mantel y escalarlo del mantel 
-    // 1. Configurar el origen del mantel al centro de la imagen (640, 360)
-// Asumiendo que tu mantel mide 1280x720, el centro es 640, 360.
-m_tableSprite.setOrigin(640.0f, 360.0f); 
+    // 1. Configurar el origen del mantel al centro de su imagen real
+    m_tableSprite.setOrigin(m_tableTexture.getSize().x / 2.0f, m_tableTexture.getSize().y / 2.0f);
+    // 2. Posicionar el mantel exactamente en el centro de la ventana
+    m_tableSprite.setPosition(640.0f, 360.0f);
+    // 3. Usar el tamaño real del mantel.jpg sin escalar
+    m_tableSprite.setScale(1.0f, 1.0f);
 
-// 2. Posicionar el mantel exactamente en el centro de la ventana
-m_tableSprite.setPosition(640.0f, 360.0f);
-
-// 3. Si tu mantel es más grande que la mesa, escala el sprite:
-// 1020 es tu ancho de mesa, 1280 es el ancho de imagen
-m_tableSprite.setScale(1020.0f / 1280.0f, 510.0f / 720.0f);
-
-
-    // 3. Cargar el Spritesheet del Coco
+    // 4. Cargar el Spritesheet del Coco
     if (!m_cocoTexture.loadFromFile("assets/images/coco.png")) {
         // Manejo de error básico
     }
