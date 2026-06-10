@@ -1,6 +1,7 @@
 #include "Game.hpp"
 #include <iostream> // Para imprimir en consola
 #include <cmath>
+#include <limits>
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
 Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 4") {
@@ -45,41 +46,235 @@ void Game::initPhysics() {
 // Grosor de las bandas
 
 float wallThickness = 60.0f;
-float pocketRadius = 33.0f; // Radio de la tronera en píxeles
 
 // Horizontales (superior e inferior, se separan para dejar espacio a las esquinas)
 //x, y, width, height
-createWall(385.0f, 75.0f, 430.0f, wallThickness);  // Superior izquierda
-createWall(895.0f, 75.0f, 430.0f, wallThickness);  // Superior derecha
-createWall(385.0f, 646.0f, 430.0f, wallThickness); // Inferior izquierda
-createWall(895.0f, 646.0f, 430.0f, wallThickness); // Inferior derecha
+createWall(385.0f, 73.0f, 423.0f, wallThickness);  // Superior izquierda
+createWall(899.0f, 73.0f, 425.0f, wallThickness);  // Superior derecha
+createWall(384.0f, 646.0f, 423.0f, wallThickness); // Inferior izquierda
+createWall(898.0f, 646.0f, 423.0f, wallThickness); // Inferior derecha
 
 // Verticales (izquierda y derecha, recortadas en los extremos para no afectar el radio de las troneras)
-createWall(96.0f, 360.0f, wallThickness, 450.0f); // Izquierda
-createWall(1185.0f, 360.0f, wallThickness, 450.0f); // Derecha
+createWall(96.0f, 360.0f, wallThickness, 425.0f); // Izquierda
+createWall(1185.0f, 358.0f, wallThickness, 427.0f); // Derecha
 
 // Esquinas ahora con dos cubos iguales en 45 grados, tangencialmente unidos al radio de las troneras
-float cubeSize = 40.0f;     // Lado del cubo de cada pieza
-float cubeOffset = pocketRadius + (cubeSize / std::sqrt(2.0f)); // Distancia del centro del pocket al centro del cubo
+// Esquinas ahora con bloques rectangulares que pasan por la esquina más cercana del muro.
+float blockLength = 120.0f; // Largo del rectángulo
+float blockThickness = 32.0f; // Grosor del rectángulo
 
-// Coordenadas centrales de las troneras (en píxeles)
-float leftX = 100.0f;
-float rightX = 1180.0f;
-float topY = 75.0f;
-float bottomY = 645.0f;
+// Top-left pocket: calcular centros para que los vértices pedidos toquen las esquinas de los muros
+{
+    float thetaDeg = 45.0f;
+    float theta = thetaDeg * 3.14159265f / 180.0f;
+    float halfW = blockLength * 0.5f;
+    float halfH = blockThickness * 0.5f;
 
-// Top-left pocket
-createWall(leftX + cubeOffset, topY, cubeSize, cubeSize, 45.0f);
-createWall(leftX, topY + cubeOffset, cubeSize, cubeSize, 45.0f);
-// Top-right pocket
-createWall(rightX - cubeOffset, topY, cubeSize, cubeSize, 45.0f);
-createWall(rightX, topY + cubeOffset, cubeSize, cubeSize, 45.0f);
-// Bottom-left pocket
-createWall(leftX + cubeOffset, bottomY, cubeSize, cubeSize, 45.0f);
-createWall(leftX, bottomY - cubeOffset, cubeSize, cubeSize, 45.0f);
-// Bottom-right pocket
-createWall(rightX - cubeOffset, bottomY, cubeSize, cubeSize, 45.0f);
-createWall(rightX, bottomY - cubeOffset, cubeSize, cubeSize, 45.0f);
+    // Coordenadas de los muros que delimitan la esquina (valores exactos según createWall anteriores)
+    float topHorCenterX = 385.0f;
+    float topHorWidth = 423.0f;
+    float topHorCenterY = 73.0f;
+
+    float vertLeftCenterX = 96.0f;
+    float vertLeftCenterY = 360.0f;
+    float vertLeftHeight = 425.0f;
+
+    // Punto objetivo A: vértice inferior-izquierdo del muro horizontal (queremos que el BR del rectángulo lo toque)
+    sf::Vector2f targetA;
+    targetA.x = topHorCenterX - (topHorWidth * 0.5f); // left edge
+    targetA.y = topHorCenterY + (wallThickness * 0.5f); // bottom edge
+
+    // Punto objetivo B: vértice superior-derecho del muro vertical (queremos que el TR del rectángulo lo toque)
+    sf::Vector2f targetB;
+    targetB.x = vertLeftCenterX + (wallThickness * 0.5f); // right edge
+    targetB.y = vertLeftCenterY - (vertLeftHeight * 0.5f); // top edge
+
+    auto rot = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(theta) - y * std::sin(theta), x * std::sin(theta) + y * std::cos(theta) };
+    };
+
+    // Para targetA queremos que el bottom-right local (halfW, halfH) coincida con targetA
+    // Nota: rot aplica rotación desde el sistema local (center como origen)
+    sf::Vector2f localBR = rot(halfW, halfH);
+    sf::Vector2f centerA = targetA - localBR;
+
+    // Para targetB queremos que el top-right local (halfW, -halfH) coincida con targetB
+    sf::Vector2f localTR = rot(halfW, -halfH);
+    sf::Vector2f centerB = targetB - localTR;
+
+    createWall(centerA.x, centerA.y, blockLength, blockThickness, thetaDeg);
+    createWall(centerB.x, centerB.y, blockLength, blockThickness, thetaDeg);
+}
+// Top-right pocket: calcular centros para que los vértices pedidos toquen las esquinas de los muros
+{
+    float thetaDeg = -45.0f;
+    float theta = thetaDeg * 3.14159265f / 180.0f;
+    float halfW = blockLength * 0.5f;
+    float halfH = blockThickness * 0.5f;
+
+    float topHor2CenterX = 899.0f;
+    float topHor2Width = 425.0f;
+    float topHorCenterY2 = 73.0f;
+
+    float vertRightCenterX = 1185.0f;
+    float vertRightCenterY = 358.0f;
+    float vertRightHeight = 427.0f;
+
+    sf::Vector2f targetA;
+    targetA.x = topHor2CenterX + (topHor2Width * 0.5f); // right edge
+    targetA.y = topHorCenterY2 + (wallThickness * 0.5f); // bottom edge
+
+    sf::Vector2f targetB;
+    targetB.x = vertRightCenterX - (wallThickness * 0.5f); // left edge of right vertical
+    targetB.y = vertRightCenterY - (vertRightHeight * 0.5f); // top edge
+
+    auto rot = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(theta) - y * std::sin(theta), x * std::sin(theta) + y * std::cos(theta) };
+    };
+
+    sf::Vector2f localA = rot(-halfW, halfH); // bottom-left local
+    sf::Vector2f localB = rot(-halfW, -halfH); // top-left local
+
+    sf::Vector2f centerA = targetA - localA;
+    sf::Vector2f centerB = targetB - localB;
+
+    createWall(centerA.x, centerA.y, blockLength, blockThickness, thetaDeg);
+    createWall(centerB.x, centerB.y, blockLength, blockThickness, thetaDeg);
+}
+
+// Bottom-left pocket: calcular centros (espejo vertical del top-left)
+{
+    float thetaDeg = -45.0f;
+    float theta = thetaDeg * 3.14159265f / 180.0f;
+    float halfW = blockLength * 0.5f;
+    float halfH = blockThickness * 0.5f;
+
+    float bottomHorCenterX = 384.0f;
+    float bottomHorWidth = 423.0f;
+    float bottomHorCenterY = 646.0f;
+
+    float vertLeftCenterX = 96.0f;
+    float vertLeftCenterY = 360.0f;
+    float vertLeftHeight = 425.0f;
+
+    sf::Vector2f targetA;
+    targetA.x = bottomHorCenterX - (bottomHorWidth * 0.5f); // left edge
+    targetA.y = bottomHorCenterY - (wallThickness * 0.5f); // top edge of bottom wall
+
+    sf::Vector2f targetB;
+    targetB.x = vertLeftCenterX + (wallThickness * 0.5f); // right edge of left vertical
+    targetB.y = vertLeftCenterY + (vertLeftHeight * 0.5f); // bottom edge
+
+    auto rot = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(theta) - y * std::sin(theta), x * std::sin(theta) + y * std::cos(theta) };
+    };
+
+    sf::Vector2f localA = rot(halfW, -halfH); // top-right local
+    sf::Vector2f localB = rot(halfW, halfH);  // bottom-right local
+
+    sf::Vector2f centerA = targetA - localA;
+    sf::Vector2f centerB = targetB - localB;
+
+    createWall(centerA.x, centerA.y, blockLength, blockThickness, thetaDeg);
+    createWall(centerB.x, centerB.y, blockLength, blockThickness, thetaDeg);
+}
+
+// Bottom-right pocket: calcular centros para la esquina inferior-derecha
+{
+    float thetaDeg = 45.0f;
+    float theta = thetaDeg * 3.14159265f / 180.0f;
+    float halfW = blockLength * 0.5f;
+    float halfH = blockThickness * 0.5f;
+
+    float bottomHor2CenterX = 898.0f;
+    float bottomHor2Width = 423.0f;
+    float bottomHor2CenterY = 646.0f;
+
+    float vertRightCenterX = 1185.0f;
+    float vertRightCenterY = 358.0f;
+    float vertRightHeight = 427.0f;
+
+    sf::Vector2f targetA;
+    targetA.x = bottomHor2CenterX + (bottomHor2Width * 0.5f); // right edge
+    targetA.y = bottomHor2CenterY - (wallThickness * 0.5f); // top edge of bottom wall
+
+    sf::Vector2f targetB;
+    targetB.x = vertRightCenterX - (wallThickness * 0.5f); // left edge of right vertical
+    targetB.y = vertRightCenterY + (vertRightHeight * 0.5f); // bottom edge
+
+    auto rot = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(theta) - y * std::sin(theta), x * std::sin(theta) + y * std::cos(theta) };
+    };
+
+    sf::Vector2f localA = rot(-halfW, -halfH); // top-left local
+    sf::Vector2f localB = rot(-halfW, halfH);  // bottom-left local
+
+    sf::Vector2f centerA = targetA - localA;
+    sf::Vector2f centerB = targetB - localB;
+
+    createWall(centerA.x, centerA.y, blockLength, blockThickness, thetaDeg);
+    createWall(centerB.x, centerB.y, blockLength, blockThickness, thetaDeg);
+}
+
+// Top-center pocket: par de cuadrados a 25 grados
+{
+    float thetaDeg = 25.0f;
+    float theta = thetaDeg * 3.14159265f / 180.0f;
+    float squareSide = blockThickness;
+    float halfSide = squareSide * 0.5f;
+
+    float leftGapX = 385.0f + (423.0f * 0.5f);
+    float rightGapX = 899.0f - (425.0f * 0.5f);
+    float topPocketY = 73.0f + (wallThickness * 0.5f);
+
+    sf::Vector2f targetA = {leftGapX, topPocketY};
+    sf::Vector2f targetB = {rightGapX, topPocketY};
+
+    auto rotA = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(theta) - y * std::sin(theta), x * std::sin(theta) + y * std::cos(theta) };
+    };
+    float thetaDegB = -25.0f;
+    float thetaB = thetaDegB * 3.14159265f / 180.0f;
+    auto rotB = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(thetaB) - y * std::sin(thetaB), x * std::sin(thetaB) + y * std::cos(thetaB) };
+    };
+
+    sf::Vector2f centerA = targetA - rotA(halfSide, halfSide);
+    sf::Vector2f centerB = targetB - rotB(-halfSide, halfSide);
+
+    createWall(centerA.x, centerA.y, squareSide, squareSide, thetaDeg);
+    createWall(centerB.x, centerB.y, squareSide, squareSide, thetaDegB);
+}
+
+// Bottom-center pocket: opuesto a los cuadrados superiores
+{
+    float thetaDegA = -25.0f;
+    float thetaA = thetaDegA * 3.14159265f / 180.0f;
+    float thetaDegB = 25.0f;
+    float thetaB = thetaDegB * 3.14159265f / 180.0f;
+    float squareSide = blockThickness;
+    float halfSide = squareSide * 0.5f;
+
+    float leftGapX = 384.0f + (423.0f * 0.5f);
+    float rightGapX = 898.0f - (423.0f * 0.5f);
+    float bottomPocketY = 646.0f - (wallThickness * 0.5f);
+
+    sf::Vector2f targetA = {leftGapX, bottomPocketY};
+    sf::Vector2f targetB = {rightGapX, bottomPocketY};
+
+    auto rotA = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(thetaA) - y * std::sin(thetaA), x * std::sin(thetaA) + y * std::cos(thetaA) };
+    };
+    auto rotB = [&](float x, float y) -> sf::Vector2f {
+        return { x * std::cos(thetaB) - y * std::sin(thetaB), x * std::sin(thetaB) + y * std::cos(thetaB) };
+    };
+
+    sf::Vector2f centerA = targetA - rotA(halfSide, -halfSide);
+    sf::Vector2f centerB = targetB - rotB(-halfSide, -halfSide);
+
+    createWall(centerA.x, centerA.y, squareSide, squareSide, thetaDegA);
+    createWall(centerB.x, centerB.y, squareSide, squareSide, thetaDegB);
+}
 
 
 }
@@ -139,6 +334,65 @@ void Game::update() {
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
     checkPockets();
     
+}
+
+sf::Vector2f Game::normalize(const sf::Vector2f& vector) const {
+    float length = std::sqrt(vector.x * vector.x + vector.y * vector.y);
+    if (length <= 0.0001f) {
+        return {0.0f, 0.0f};
+    }
+    return {vector.x / length, vector.y / length};
+}
+
+float Game::dot(const sf::Vector2f& a, const sf::Vector2f& b) const {
+    return a.x * b.x + a.y * b.y;
+}
+
+bool Game::predictBallCollision(const sf::Vector2f& origin,
+                                 const sf::Vector2f& direction,
+                                 sf::Vector2f& collisionPoint,
+                                 sf::Vector2f& reboundDir,
+                                 b2BodyId& hitId) const {
+    const float ballRadiusPixels = 15.0f;
+    const float combinedRadius = ballRadiusPixels * 2.0f;
+    const float combinedRadiusSq = combinedRadius * combinedRadius;
+    float closestT = std::numeric_limits<float>::infinity();
+    bool found = false;
+
+    for (b2BodyId id : m_fruitIds) {
+        b2Vec2 pos = b2Body_GetPosition(id);
+        sf::Vector2f center = {pos.x * SCALE, pos.y * SCALE};
+        sf::Vector2f oc = center - origin;
+
+        float tca = dot(oc, direction);
+        if (tca < 0.0f) {
+            continue;
+        }
+
+        float d2 = dot(oc, oc) - (tca * tca);
+        if (d2 > combinedRadiusSq) {
+            continue;
+        }
+
+        float thc = std::sqrt(std::max(0.0f, combinedRadiusSq - d2));
+        float t0 = tca - thc;
+        float t1 = tca + thc;
+        float t = (t0 >= 0.0f) ? t0 : t1;
+        if (t < 0.0f) {
+            continue;
+        }
+
+        if (t < closestT) {
+            closestT = t;
+            found = true;
+            hitId = id;
+            collisionPoint = origin + direction * t;
+            sf::Vector2f normal = normalize(collisionPoint - center);
+            reboundDir = normal;
+        }
+    }
+
+    return found;
 }
 
 void Game::render() {
@@ -214,93 +468,133 @@ m_cocoSprite.setColor(sf::Color::White);
 if (m_isAiming) {
     // 1. Obtener la posición física central del Coco
     b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
-    float SCALE = 30.0f; 
-    float pixelX = pos.x * SCALE;
-    float pixelY = pos.y * SCALE;
+        float pixelX = pos.x * SCALE;
+        float pixelY = pos.y * SCALE;
 
-    // 2. Calcular el vector de "jalón"
-    sf::Vector2i currentMousePos = sf::Mouse::getPosition(m_window);
-    float pullX = m_mouseStartPos.x - currentMousePos.x;
-    float pullY = m_mouseStartPos.y - currentMousePos.y;
+        // 2. Calcular el vector de "jalón"
+        sf::Vector2i currentMousePos = sf::Mouse::getPosition(m_window);
+        float pullX = m_mouseStartPos.x - currentMousePos.x;
+        float pullY = m_mouseStartPos.y - currentMousePos.y;
 
-    // 3. Limitar el retroceso máximo de la caña (Clamp)
-    float pullDist = std::sqrt(pullX * pullX + pullY * pullY);
-    float maxPull = 120.0f; // Píxeles máximos que la caña se hará hacia atrás
-    
-    if (pullDist > maxPull) {
-        pullX = (pullX / pullDist) * maxPull;
-        pullY = (pullY / pullDist) * maxPull;
+        // 3. Limitar el retroceso máximo de la caña (Clamp)
+        float pullDist = std::sqrt(pullX * pullX + pullY * pullY);
+        float maxPull = 120.0f; // Píxeles máximos que la caña se hará hacia atrás
+        if (pullDist > maxPull) {
+            pullX = (pullX / pullDist) * maxPull;
+            pullY = (pullY / pullDist) * maxPull;
+            pullDist = maxPull;
+        }
+
+        // 4. Dibujar la Guía de Tiro y la predicción de impacto con otra bola
+        sf::Vector2f aimDir = normalize({pullX, pullY});
+        float shotAngle = std::atan2(aimDir.y, aimDir.x) * 180.0f / 3.14159265f;
+
+        sf::Vector2f origin = {pixelX, pixelY};
+        sf::Vector2f aimEnd = origin + aimDir * 900.0f;
+
+        sf::Vector2f collisionPoint;
+        sf::Vector2f reboundDir;
+        b2BodyId hitId;
+        bool hasCollision = predictBallCollision(origin, aimDir, collisionPoint, reboundDir, hitId);
+        if (hasCollision) {
+            aimEnd = collisionPoint;
+        }
+
+        float aimLength = std::sqrt(dot(aimEnd - origin, aimEnd - origin));
+        sf::RectangleShape aimLine({aimLength, 4.0f});
+        aimLine.setOrigin({0.0f, 2.0f});
+        aimLine.setPosition(origin);
+        aimLine.setRotation(shotAngle);
+        aimLine.setFillColor(sf::Color(255, 255, 255, 160));
+        m_window.draw(aimLine);
+
+        if (hasCollision) {
+            sf::CircleShape impactDot(7.0f);
+            impactDot.setOrigin(7.0f, 7.0f);
+            impactDot.setPosition(collisionPoint);
+            impactDot.setFillColor(sf::Color(255, 220, 70, 220));
+            m_window.draw(impactDot);
+
+            float reboundAngle = std::atan2(reboundDir.y, reboundDir.x) * 180.0f / 3.14159265f;
+            sf::RectangleShape reboundLine({150.0f, 3.0f});
+            reboundLine.setOrigin({0.0f, 1.5f});
+            reboundLine.setPosition(collisionPoint);
+            reboundLine.setRotation(reboundAngle);
+            reboundLine.setFillColor(sf::Color(255, 180, 0, 180));
+            m_window.draw(reboundLine);
+
+            sf::CircleShape reboundHead(5.0f);
+            reboundHead.setOrigin({5.0f, 5.0f});
+            reboundHead.setPosition(collisionPoint + reboundDir * 150.0f);
+            reboundHead.setFillColor(sf::Color(255, 180, 0, 220));
+            m_window.draw(reboundHead);
+
+            float inAngle = std::atan2(aimDir.y, aimDir.x);
+            float outAngle = std::atan2(reboundDir.y, reboundDir.x);
+            float diff = outAngle - inAngle;
+            if (diff > 3.14159265f) diff -= 2.0f * 3.14159265f;
+            if (diff < -3.14159265f) diff += 2.0f * 3.14159265f;
+
+            const int segments = 16;
+            sf::VertexArray arc(sf::LineStrip, segments + 1);
+            for (int i = 0; i <= segments; ++i) {
+                float angle = inAngle + diff * (static_cast<float>(i) / static_cast<float>(segments));
+                arc[i].position = collisionPoint + sf::Vector2f(std::cos(angle), std::sin(angle)) * 24.0f;
+                arc[i].color = sf::Color(255, 230, 100, 200);
+            }
+            m_window.draw(arc);
+        }
+
+        // 5. Dibujar la Caña de Azúcar con Retroceso
+        float stickAngle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
+        m_cueSprite.setPosition({pixelX - pullX, pixelY - pullY});
+        m_cueSprite.setRotation(stickAngle);
+        m_window.draw(m_cueSprite);
+
+        float powerPercentage = std::min(pullDist / maxPull, 1.0f); // Valor entre 0 y 1
+
+        // Dimensiones de la barra
+        float barWidth = 30.0f;
+        float barHeight = 200.0f;
+        float barX = 20.0f; // Lado izquierdo
+        float barY = 260.0f; // Centrado verticalmente aproximadamente
+
+        // Barra de fondo (gris oscuro)
+        sf::RectangleShape barBackground({barWidth, barHeight});
+        barBackground.setPosition({barX, barY});
+        barBackground.setFillColor(sf::Color(50, 50, 50));
+        m_window.draw(barBackground);
+
+        // Barra de relleno con color dinámico
+        float fillHeight = barHeight * powerPercentage;
+        sf::RectangleShape barFill({barWidth, fillHeight});
+        barFill.setPosition({barX, barY + barHeight - fillHeight}); // Desde abajo hacia arriba
+
+        // Determinar el color según la potencia
+        sf::Color powerColor;
+        if (powerPercentage < 0.33f) {
+            // Verde (bajo)
+            powerColor = sf::Color(0, 255, 0);
+        } else if (powerPercentage < 0.66f) {
+            // Amarillo (intermedio)
+            powerColor = sf::Color(255, 255, 0);
+        } else {
+            // Rojo (máximo)
+            powerColor = sf::Color(255, 0, 0);
+        }
+
+        barFill.setFillColor(powerColor);
+        m_window.draw(barFill);
+
+        // Borde de la barra (blanco)
+        sf::RectangleShape barBorder({barWidth, barHeight});
+        barBorder.setPosition({barX, barY});
+        barBorder.setFillColor(sf::Color::Transparent);
+        barBorder.setOutlineThickness(2.0f);
+        barBorder.setOutlineColor(sf::Color::White);
+        m_window.draw(barBorder);
     }
-
-    // 4. Dibujar la Guía de Tiro (Línea Gruesa Fija)
-    // El ángulo de tiro va en dirección contraria al jalón del ratón
-    float shotAngle = std::atan2(pullY, pullX) * 180.0f / 3.14159265f;
-
-    sf::RectangleShape aimLine;
-    aimLine.setSize({900.0f, 4.0f}); // 800px de largo fijo, 4px de grosor
-    aimLine.setOrigin({0.0f, 2.0f}); // Centrar el grosor verticalmente
-    aimLine.setPosition({pixelX, pixelY});
-    aimLine.setRotation(shotAngle);
-    aimLine.setFillColor(sf::Color(255, 255, 255, 120)); // Blanco semi-transparente
-    
-    m_window.draw(aimLine);
-
-    // 5. Dibujar la Caña de Azúcar con Retroceso
-    // El ángulo del taco está invertido respecto al tiro
-    float stickAngle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
-    
-    // Restamos pullX y pullY a la posición del Coco para mover el taco hacia atrás
-    m_cueSprite.setPosition({pixelX - pullX, pixelY - pullY});
-    m_cueSprite.setRotation(stickAngle);
-    
-    m_window.draw(m_cueSprite);
-
-    // 6. NUEVO: Barra de Potencia en el lado izquierdo
-    float powerPercentage = std::min(pullDist / maxPull, 1.0f); // Valor entre 0 y 1
-
-    // Dimensiones de la barra
-    float barWidth = 30.0f;
-    float barHeight = 200.0f;
-    float barX = 20.0f; // Lado izquierdo
-    float barY = 260.0f; // Centrado verticalmente aproximadamente
-
-    // Barra de fondo (gris oscuro)
-    sf::RectangleShape barBackground({barWidth, barHeight});
-    barBackground.setPosition({barX, barY});
-    barBackground.setFillColor(sf::Color(50, 50, 50));
-    m_window.draw(barBackground);
-
-    // Barra de relleno con color dinámico
-    float fillHeight = barHeight * powerPercentage;
-    sf::RectangleShape barFill({barWidth, fillHeight});
-    barFill.setPosition({barX, barY + barHeight - fillHeight}); // Desde abajo hacia arriba
-
-    // Determinar el color según la potencia
-    sf::Color powerColor;
-    if (powerPercentage < 0.33f) {
-        // Verde (bajo)
-        powerColor = sf::Color(0, 255, 0);
-    } else if (powerPercentage < 0.66f) {
-        // Amarillo (intermedio)
-        powerColor = sf::Color(255, 255, 0);
-    } else {
-        // Rojo (máximo)
-        powerColor = sf::Color(255, 0, 0);
-    }
-
-    barFill.setFillColor(powerColor);
-    m_window.draw(barFill);
-
-    // Borde de la barra (blanco)
-    sf::RectangleShape barBorder({barWidth, barHeight});
-    barBorder.setPosition({barX, barY});
-    barBorder.setFillColor(sf::Color::Transparent);
-    barBorder.setOutlineThickness(2.0f);
-    barBorder.setOutlineColor(sf::Color::White);
-    m_window.draw(barBorder);
-}
-       m_window.display();
-       
+    m_window.display();
 }
 
 void Game::createWall(float x, float y, float width, float height, float angleDegrees) {

@@ -71,4 +71,13 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 // Nuevas funciones
 void loadAssets();
 void updateAnimation();
+
+    // --- Ayudas de apuntado y predicción ---
+    sf::Vector2f normalize(const sf::Vector2f& vector) const;
+    float dot(const sf::Vector2f& a, const sf::Vector2f& b) const;
+    bool predictBallCollision(const sf::Vector2f& origin,
+                              const sf::Vector2f& direction,
+                              sf::Vector2f& collisionPoint,
+                              sf::Vector2f& reboundDir,
+                              b2BodyId& hitId) const;
 };
