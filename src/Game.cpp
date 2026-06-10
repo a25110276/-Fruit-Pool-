@@ -231,6 +231,50 @@ if (m_isAiming) {
     m_cueSprite.setRotation(stickAngle);
     
     m_window.draw(m_cueSprite);
+
+    // 6. NUEVO: Barra de Potencia en el lado izquierdo
+    float powerPercentage = std::min(pullDist / maxPull, 1.0f); // Valor entre 0 y 1
+
+    // Dimensiones de la barra
+    float barWidth = 30.0f;
+    float barHeight = 200.0f;
+    float barX = 20.0f; // Lado izquierdo
+    float barY = 260.0f; // Centrado verticalmente aproximadamente
+
+    // Barra de fondo (gris oscuro)
+    sf::RectangleShape barBackground({barWidth, barHeight});
+    barBackground.setPosition({barX, barY});
+    barBackground.setFillColor(sf::Color(50, 50, 50));
+    m_window.draw(barBackground);
+
+    // Barra de relleno con color dinámico
+    float fillHeight = barHeight * powerPercentage;
+    sf::RectangleShape barFill({barWidth, fillHeight});
+    barFill.setPosition({barX, barY + barHeight - fillHeight}); // Desde abajo hacia arriba
+
+    // Determinar el color según la potencia
+    sf::Color powerColor;
+    if (powerPercentage < 0.33f) {
+        // Verde (bajo)
+        powerColor = sf::Color(0, 255, 0);
+    } else if (powerPercentage < 0.66f) {
+        // Amarillo (intermedio)
+        powerColor = sf::Color(255, 255, 0);
+    } else {
+        // Rojo (máximo)
+        powerColor = sf::Color(255, 0, 0);
+    }
+
+    barFill.setFillColor(powerColor);
+    m_window.draw(barFill);
+
+    // Borde de la barra (blanco)
+    sf::RectangleShape barBorder({barWidth, barHeight});
+    barBorder.setPosition({barX, barY});
+    barBorder.setFillColor(sf::Color::Transparent);
+    barBorder.setOutlineThickness(2.0f);
+    barBorder.setOutlineColor(sf::Color::White);
+    m_window.draw(barBorder);
 }
        m_window.display();
        
