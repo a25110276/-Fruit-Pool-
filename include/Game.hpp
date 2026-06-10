@@ -27,9 +27,12 @@ std::vector<b2BodyId> m_fruitIds;
 void spawnTriangle();
 
     // NUEVO: Función modular para crear muros invisibles
-    void createWall(float x, float y, float width, float height);
+    void createWall(float x, float y, float width, float height, float angleDegrees = 0.0f);
+
+    struct WallRender { float x, y, w, h, angle; };
+    std::vector<WallRender> m_wallRenders;
     
-    bool m_isAiming = false;// Variables para la mecánica del taco
+    bool m_isAiming = false; // Variables para la mecánica del taco
     sf::Vector2f m_mouseStartPos;
     sf::RenderWindow m_window;
     

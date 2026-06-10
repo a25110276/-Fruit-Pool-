@@ -45,16 +45,41 @@ void Game::initPhysics() {
 // Grosor de las bandas
 
 float wallThickness = 60.0f;
+float pocketRadius = 33.0f; // Radio de la tronera en píxeles
 
-// Horizontales (superior e inferior, divididas en 2 segmentos)
-createWall(385.0f, 75.0f, 450.0f, wallThickness);  // Superior izquierda
-createWall(895.0f, 75.0f, 450.0f, wallThickness);  // Superior derecha
-createWall(385.0f, 645.0f, 450.0f, wallThickness); // Inferior izquierda
-createWall(895.0f, 645.0f, 450.0f, wallThickness); // Inferior derecha
+// Horizontales (superior e inferior, se separan para dejar espacio a las esquinas)
+//x, y, width, height
+createWall(385.0f, 75.0f, 430.0f, wallThickness);  // Superior izquierda
+createWall(895.0f, 75.0f, 430.0f, wallThickness);  // Superior derecha
+createWall(385.0f, 646.0f, 430.0f, wallThickness); // Inferior izquierda
+createWall(895.0f, 646.0f, 430.0f, wallThickness); // Inferior derecha
 
-// Verticales (izquierda y derecha, completas pero recortadas arriba/abajo)
-createWall(100.0f, 360.0f, wallThickness, 450.0f); // Izquierda
-createWall(1180.0f, 360.0f, wallThickness, 450.0f); // Derecha
+// Verticales (izquierda y derecha, recortadas en los extremos para no afectar el radio de las troneras)
+createWall(96.0f, 360.0f, wallThickness, 450.0f); // Izquierda
+createWall(1185.0f, 360.0f, wallThickness, 450.0f); // Derecha
+
+// Esquinas ahora con dos cubos iguales en 45 grados, tangencialmente unidos al radio de las troneras
+float cubeSize = 40.0f;     // Lado del cubo de cada pieza
+float cubeOffset = pocketRadius + (cubeSize / std::sqrt(2.0f)); // Distancia del centro del pocket al centro del cubo
+
+// Coordenadas centrales de las troneras (en píxeles)
+float leftX = 100.0f;
+float rightX = 1180.0f;
+float topY = 75.0f;
+float bottomY = 645.0f;
+
+// Top-left pocket
+createWall(leftX + cubeOffset, topY, cubeSize, cubeSize, 45.0f);
+createWall(leftX, topY + cubeOffset, cubeSize, cubeSize, 45.0f);
+// Top-right pocket
+createWall(rightX - cubeOffset, topY, cubeSize, cubeSize, 45.0f);
+createWall(rightX, topY + cubeOffset, cubeSize, cubeSize, 45.0f);
+// Bottom-left pocket
+createWall(leftX + cubeOffset, bottomY, cubeSize, cubeSize, 45.0f);
+createWall(leftX, bottomY - cubeOffset, cubeSize, cubeSize, 45.0f);
+// Bottom-right pocket
+createWall(rightX - cubeOffset, bottomY, cubeSize, cubeSize, 45.0f);
+createWall(rightX, bottomY - cubeOffset, cubeSize, cubeSize, 45.0f);
 
 
 }
@@ -135,6 +160,29 @@ void Game::render() {
     m_window.draw(m_backgroundSprite);
     m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
     m_window.draw(m_frameSprite);   // Marco encima del mantel
+
+    // --- DEBUG: Render provisional de muros invisibles ---
+    sf::Color wallDebugColor(0, 150, 255, 120); // Azul semi-transparente
+    for (const auto& wall : m_wallRenders) {
+        sf::RectangleShape wallRect({wall.w, wall.h});
+        wallRect.setOrigin(wall.w / 2.0f, wall.h / 2.0f);
+        wallRect.setPosition(wall.x, wall.y);
+        wallRect.setRotation(wall.angle);
+        wallRect.setFillColor(wallDebugColor);
+        m_window.draw(wallRect);
+    }
+
+    // --- DEBUG: Recortes semicirculares en las troneras ---
+    sf::Color cutoutColor(20, 80, 150, 255);
+    float pocketRadiusPixels = m_pocketRadius * 30.0f;
+    for (const auto& pocket : m_pockets) {
+        sf::CircleShape cutout(pocketRadiusPixels);
+        cutout.setOrigin(pocketRadiusPixels, pocketRadiusPixels);
+        cutout.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
+        cutout.setFillColor(cutoutColor);
+        m_window.draw(cutout);
+    }
+
     m_window.draw(m_cocoSprite);    // Luego las frutas
 
 // --- DEBUG: Dibujo de Troneras Provisionales ---
@@ -255,13 +303,16 @@ if (m_isAiming) {
        
 }
 
-void Game::createWall(float x, float y, float width, float height) {
+void Game::createWall(float x, float y, float width, float height, float angleDegrees) {
     b2BodyDef bodyDef = b2DefaultBodyDef();
     bodyDef.type = b2_staticBody; // Estático: inamovible como una pared
     // Box2D ubica los rectángulos desde su centro, por eso dividimos entre SCALE
-    bodyDef.position = {x / SCALE, y / SCALE}; 
+    bodyDef.position = {x / SCALE, y / SCALE};
     
     b2BodyId wallId = b2CreateBody(m_worldId, &bodyDef);
+    if (std::abs(angleDegrees) > 0.001f) {
+        b2Body_SetTransform(wallId, bodyDef.position, b2MakeRot(angleDegrees * 3.14159265f / 180.0f));
+    }
 
     // Box2D requiere "half-widths" (la mitad del ancho y alto) para crear cajas
     b2Polygon box = b2MakeBox((width / 2.0f) / SCALE, (height / 2.0f) / SCALE);
@@ -271,6 +322,9 @@ void Game::createWall(float x, float y, float width, float height) {
     shapeDef.restitution = 0.6f; // Esto simula el rebote elástico de las bandas de billar
 
     b2CreatePolygonShape(wallId, &shapeDef, &box);
+
+    // Guardar datos de render para el muro invisible con las mismas medidas
+    m_wallRenders.push_back({x, y, width, height, angleDegrees});
 }
 
 void Game::loadAssets() {
@@ -420,17 +474,17 @@ void Game::initPockets() {
     float SCALE = 30.0f; 
     m_pockets.clear();
 
-    m_pocketRadius = 30.0f / SCALE; // Radio de atracción del agujero
+    m_pocketRadius = 33.0f / SCALE; // Radio de atracción del agujero
 
     // Troneras Superiores (Y = 105)
-    m_pockets.push_back({100.0f / SCALE, 75.0f / SCALE});   // Izquierda
+    m_pockets.push_back({110.0f / SCALE, 85.0f / SCALE});   // Izquierda
     m_pockets.push_back({640.0f / SCALE, 75.0f / SCALE});   // Centro
-    m_pockets.push_back({1180.0f / SCALE, 75.0f / SCALE});  // Derecha
+    m_pockets.push_back({1170.0f / SCALE, 85.0f / SCALE});  // Derecha
 
     // Troneras Inferiores (Y = 615)
-    m_pockets.push_back({100.0f / SCALE, 645.0f / SCALE});   // Izquierda
+    m_pockets.push_back({110.0f / SCALE, 635.0f / SCALE});   // Izquierda
     m_pockets.push_back({640.0f / SCALE, 645.0f / SCALE});   // Centro
-    m_pockets.push_back({1180.0f / SCALE, 645.0f / SCALE});  // Derecha
+    m_pockets.push_back({1170.0f / SCALE, 633.0f / SCALE});  // Derecha
 }
 
 void Game::checkPockets() {
