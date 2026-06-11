@@ -23,7 +23,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 run: all
-	./$(EXECUTABLE)
+	$(EXECUTABLE)
 
 clean:
 	rm -rf $(OBJ_DIR) $(EXECUTABLE)

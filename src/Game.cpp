@@ -28,23 +28,23 @@ void Game::initPhysics() {
     bodyDef.type = b2_dynamicBody;
     bodyDef.position = {385.0f / SCALE, 360.0f / SCALE}; // Posición inicial del Coco
     bodyDef.linearDamping = 1.2f; // Fricción del tapete
-    bodyDef.angularDamping = 1.0f;
+    bodyDef.angularDamping = 0.8f;// Fricción de rotación para que no gire indefinidamente
 
     m_cueBallId = b2CreateBody(m_worldId, &bodyDef);
 
-    // 3. Darle forma y peso
+    // 3. Darle forma y peso 
     b2Circle dynamicCircle;
-    dynamicCircle.center = {0.0f, 0.0f};
-    dynamicCircle.radius = 15.0f / SCALE; 
+    dynamicCircle.center = {0.0f, 0.0f};// El centro del círculo se define en el sistema local del cuerpo
+    dynamicCircle.radius = 15.0f / SCALE; // Radio del Coco (15 píxeles convertido a metros físicos)
 
     b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.0f; 
-    shapeDef.friction = 0.1f;
-    shapeDef.restitution = 0.8f; // Rebote
+    shapeDef.density = 1.0f;// Densidad del Coco (puedes ajustar para que se sienta más pesado o ligero)
+    shapeDef.friction = 0.1f;// Fricción entre la bola y el tapete
+    shapeDef.restitution = 0.9f; // Rebote
 
     b2CreateCircleShape(m_cueBallId, &shapeDef, &dynamicCircle);
+    
 // Grosor de las bandas
-
 float wallThickness = 60.0f;
 
 // Horizontales (superior e inferior, se separan para dejar espacio a las esquinas)
@@ -315,8 +315,8 @@ void Game::processEvents() {
                 float deltaX = m_mouseStartPos.x - mouseEndPos.x;
                 float deltaY = m_mouseStartPos.y - mouseEndPos.y;
 
-                // Creamos un vector de fuerza. Multiplicamos por 0.05f para suavizar la magnitud.
-                b2Vec2 impulse = {deltaX * 0.05f, deltaY * 0.05f};
+                // Creamos un vector de fuerza. Multiplicamos por 0.40f para mucho más potencia.
+                b2Vec2 impulse = {deltaX * 0.40f, deltaY * 0.40f};
                 
                 // Obtenemos la posición actual de la bola
                 b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
@@ -395,6 +395,112 @@ bool Game::predictBallCollision(const sf::Vector2f& origin,
     return found;
 }
 
+std::vector<std::pair<sf::Vector2f, sf::Vector2f>> Game::predictTrajectory(const sf::Vector2f& origin,
+                                                                             const sf::Vector2f& direction,
+                                                                             int maxBounces) const {
+    std::vector<std::pair<sf::Vector2f, sf::Vector2f>> trajectory;
+    
+    sf::Vector2f currentPos = origin;
+    sf::Vector2f currentDir = normalize(direction);
+    const float maxRayDistance = 2000.0f;
+    const float ballRadiusPixels = 15.0f;
+    
+    for (int bounce = 0; bounce < maxBounces; ++bounce) {
+        float closestT = maxRayDistance;
+        sf::Vector2f hitPoint = currentPos + currentDir * maxRayDistance;
+        sf::Vector2f nextDir = currentDir;
+        
+        // Detectar colisiones con frutas
+        for (b2BodyId id : m_fruitIds) {
+            b2Vec2 pos = b2Body_GetPosition(id);
+            sf::Vector2f center = {pos.x * SCALE, pos.y * SCALE};
+            sf::Vector2f oc = center - currentPos;
+            
+            float tca = dot(oc, currentDir);
+            if (tca < 0.1f) continue;
+            
+            float d2 = dot(oc, oc) - (tca * tca);
+            float combinedRadiusSq = (ballRadiusPixels * 2.0f) * (ballRadiusPixels * 2.0f);
+            if (d2 > combinedRadiusSq) continue;
+            
+            float thc = std::sqrt(std::max(0.0f, combinedRadiusSq - d2));
+            float t = tca - thc;
+            if (t > 0.1f && t < closestT) {
+                closestT = t;
+                hitPoint = currentPos + currentDir * t;
+                sf::Vector2f normal = normalize(hitPoint - center);
+                nextDir = normal;
+            }
+        }
+        
+        // Detectar colisiones con paredes (simplificado: aproximación a raycast contra rectángulos)
+        for (const WallRender& wall : m_wallRenders) {
+            // Para simplificar, tratamos cada pared como un rectángulo sin rotación aproximado
+            float halfW = wall.w * 0.5f;
+            float halfH = wall.h * 0.5f;
+            
+            // AABB simple para las paredes (sin considerar rotación para simplificar)
+            float left = wall.x - halfW;
+            float right = wall.x + halfW;
+            float top = wall.y - halfH;
+            float bottom = wall.y + halfH;
+            
+            // Ray-AABB intersection
+            float tMin = 0.0f, tMax = maxRayDistance;
+            
+            for (int axis = 0; axis < 2; ++axis) {
+                float rayStart = (axis == 0) ? currentPos.x : currentPos.y;
+                float rayDirComponent = (axis == 0) ? currentDir.x : currentDir.y;
+                float minBound = (axis == 0) ? left : top;
+                float maxBound = (axis == 0) ? right : bottom;
+                
+                if (std::abs(rayDirComponent) < 0.0001f) {
+                    if (rayStart < minBound || rayStart > maxBound) {
+                        tMin = maxRayDistance + 1.0f;
+                        break;
+                    }
+                } else {
+                    float t1 = (minBound - rayStart) / rayDirComponent;
+                    float t2 = (maxBound - rayStart) / rayDirComponent;
+                    if (t1 > t2) std::swap(t1, t2);
+                    tMin = std::max(tMin, t1);
+                    tMax = std::min(tMax, t2);
+                    if (tMin > tMax) {
+                        tMin = maxRayDistance + 1.0f;
+                        break;
+                    }
+                }
+            }
+            
+            if (tMin > 0.1f && tMin < closestT) {
+                closestT = tMin;
+                hitPoint = currentPos + currentDir * tMin;
+                
+                // Calcular normal aproximada
+                float dx = hitPoint.x - wall.x;
+                float dy = hitPoint.y - wall.y;
+                
+                if (std::abs(dx) > std::abs(dy)) {
+                    nextDir = {-currentDir.x, currentDir.y};
+                } else {
+                    nextDir = {currentDir.x, -currentDir.y};
+                }
+            }
+        }
+        
+        trajectory.push_back({currentPos, hitPoint});
+        
+        if (closestT >= maxRayDistance - 1.0f) {
+            break;
+        }
+        
+        currentPos = hitPoint + normalize(nextDir) * 5.0f; // Pequeño offset para evitar auto-intersección
+        currentDir = nextDir;
+    }
+    
+    return trajectory;
+}
+
 void Game::render() {
 
 
@@ -415,42 +521,7 @@ void Game::render() {
     m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
     m_window.draw(m_frameSprite);   // Marco encima del mantel
 
-    // --- DEBUG: Render provisional de muros invisibles ---
-    sf::Color wallDebugColor(0, 150, 255, 120); // Azul semi-transparente
-    for (const auto& wall : m_wallRenders) {
-        sf::RectangleShape wallRect({wall.w, wall.h});
-        wallRect.setOrigin(wall.w / 2.0f, wall.h / 2.0f);
-        wallRect.setPosition(wall.x, wall.y);
-        wallRect.setRotation(wall.angle);
-        wallRect.setFillColor(wallDebugColor);
-        m_window.draw(wallRect);
-    }
-
-    // --- DEBUG: Recortes semicirculares en las troneras ---
-    sf::Color cutoutColor(20, 80, 150, 255);
-    float pocketRadiusPixels = m_pocketRadius * 30.0f;
-    for (const auto& pocket : m_pockets) {
-        sf::CircleShape cutout(pocketRadiusPixels);
-        cutout.setOrigin(pocketRadiusPixels, pocketRadiusPixels);
-        cutout.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
-        cutout.setFillColor(cutoutColor);
-        m_window.draw(cutout);
-    }
-
     m_window.draw(m_cocoSprite);    // Luego las frutas
-
-// --- DEBUG: Dibujo de Troneras Provisionales ---
-for (const auto& pocket : m_pockets) {
-    sf::CircleShape debugPocket(m_pocketRadius * 30.0f); // Multiplicamos por la escala
-    debugPocket.setOrigin(m_pocketRadius * 30.0f, m_pocketRadius * 30.0f);
-    
-    // Aquí es la clave: La posición del pocket es la misma que la física
-    debugPocket.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
-    
-    debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
-    m_window.draw(debugPocket);
-}
-
 
     // Dibuja el resto de las frutas de la mesa
 float SCALE = 30.0f;
@@ -478,19 +549,18 @@ if (m_isAiming) {
 
         // 3. Limitar el retroceso máximo de la caña (Clamp)
         float pullDist = std::sqrt(pullX * pullX + pullY * pullY);
-        float maxPull = 120.0f; // Píxeles máximos que la caña se hará hacia atrás
+        float maxPull = 200.0f; // Píxeles máximos que la caña se hará hacia atrás
         if (pullDist > maxPull) {
             pullX = (pullX / pullDist) * maxPull;
             pullY = (pullY / pullDist) * maxPull;
             pullDist = maxPull;
         }
 
-        // 4. Dibujar la Guía de Tiro y la predicción de impacto con otra bola
+        // 4. Dibujar la Guía de Tiro
         sf::Vector2f aimDir = normalize({pullX, pullY});
-        float shotAngle = std::atan2(aimDir.y, aimDir.x) * 180.0f / 3.14159265f;
 
         sf::Vector2f origin = {pixelX, pixelY};
-        sf::Vector2f aimEnd = origin + aimDir * 900.0f;
+        sf::Vector2f aimEnd = origin + aimDir * 1500.0f;
 
         sf::Vector2f collisionPoint;
         sf::Vector2f reboundDir;
@@ -500,50 +570,15 @@ if (m_isAiming) {
             aimEnd = collisionPoint;
         }
 
+        // Dibujar la línea blanca de la trayectoria del coco
+        float shotAngle = std::atan2(aimDir.y, aimDir.x) * 180.0f / 3.14159265f;
         float aimLength = std::sqrt(dot(aimEnd - origin, aimEnd - origin));
-        sf::RectangleShape aimLine({aimLength, 4.0f});
-        aimLine.setOrigin({0.0f, 2.0f});
+        sf::RectangleShape aimLine({aimLength, 3.0f});
+        aimLine.setOrigin({0.0f, 1.5f});
         aimLine.setPosition(origin);
         aimLine.setRotation(shotAngle);
-        aimLine.setFillColor(sf::Color(255, 255, 255, 160));
+        aimLine.setFillColor(sf::Color(255, 255, 255, 200));
         m_window.draw(aimLine);
-
-        if (hasCollision) {
-            sf::CircleShape impactDot(7.0f);
-            impactDot.setOrigin(7.0f, 7.0f);
-            impactDot.setPosition(collisionPoint);
-            impactDot.setFillColor(sf::Color(255, 220, 70, 220));
-            m_window.draw(impactDot);
-
-            float reboundAngle = std::atan2(reboundDir.y, reboundDir.x) * 180.0f / 3.14159265f;
-            sf::RectangleShape reboundLine({150.0f, 3.0f});
-            reboundLine.setOrigin({0.0f, 1.5f});
-            reboundLine.setPosition(collisionPoint);
-            reboundLine.setRotation(reboundAngle);
-            reboundLine.setFillColor(sf::Color(255, 180, 0, 180));
-            m_window.draw(reboundLine);
-
-            sf::CircleShape reboundHead(5.0f);
-            reboundHead.setOrigin({5.0f, 5.0f});
-            reboundHead.setPosition(collisionPoint + reboundDir * 150.0f);
-            reboundHead.setFillColor(sf::Color(255, 180, 0, 220));
-            m_window.draw(reboundHead);
-
-            float inAngle = std::atan2(aimDir.y, aimDir.x);
-            float outAngle = std::atan2(reboundDir.y, reboundDir.x);
-            float diff = outAngle - inAngle;
-            if (diff > 3.14159265f) diff -= 2.0f * 3.14159265f;
-            if (diff < -3.14159265f) diff += 2.0f * 3.14159265f;
-
-            const int segments = 16;
-            sf::VertexArray arc(sf::LineStrip, segments + 1);
-            for (int i = 0; i <= segments; ++i) {
-                float angle = inAngle + diff * (static_cast<float>(i) / static_cast<float>(segments));
-                arc[i].position = collisionPoint + sf::Vector2f(std::cos(angle), std::sin(angle)) * 24.0f;
-                arc[i].color = sf::Color(255, 230, 100, 200);
-            }
-            m_window.draw(arc);
-        }
 
         // 5. Dibujar la Caña de Azúcar con Retroceso
         float stickAngle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
