@@ -28,23 +28,23 @@ void Game::initPhysics() {
     bodyDef.type = b2_dynamicBody;
     bodyDef.position = {385.0f / SCALE, 360.0f / SCALE}; // Posición inicial del Coco
     bodyDef.linearDamping = 1.2f; // Fricción del tapete
-    bodyDef.angularDamping = 1.0f;
+    bodyDef.angularDamping = 0.8f;// Fricción de rotación para que no gire indefinidamente
 
     m_cueBallId = b2CreateBody(m_worldId, &bodyDef);
 
-    // 3. Darle forma y peso
+    // 3. Darle forma y peso 
     b2Circle dynamicCircle;
-    dynamicCircle.center = {0.0f, 0.0f};
-    dynamicCircle.radius = 15.0f / SCALE; 
+    dynamicCircle.center = {0.0f, 0.0f};// El centro del círculo se define en el sistema local del cuerpo
+    dynamicCircle.radius = 15.0f / SCALE; // Radio del Coco (15 píxeles convertido a metros físicos)
 
     b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.0f; 
-    shapeDef.friction = 0.1f;
-    shapeDef.restitution = 0.8f; // Rebote
+    shapeDef.density = 1.0f;// Densidad del Coco (puedes ajustar para que se sienta más pesado o ligero)
+    shapeDef.friction = 0.1f;// Fricción entre la bola y el tapete
+    shapeDef.restitution = 0.9f; // Rebote
 
     b2CreateCircleShape(m_cueBallId, &shapeDef, &dynamicCircle);
+    
 // Grosor de las bandas
-
 float wallThickness = 60.0f;
 
 // Horizontales (superior e inferior, se separan para dejar espacio a las esquinas)
@@ -415,42 +415,7 @@ void Game::render() {
     m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
     m_window.draw(m_frameSprite);   // Marco encima del mantel
 
-    // --- DEBUG: Render provisional de muros invisibles ---
-    sf::Color wallDebugColor(0, 150, 255, 120); // Azul semi-transparente
-    for (const auto& wall : m_wallRenders) {
-        sf::RectangleShape wallRect({wall.w, wall.h});
-        wallRect.setOrigin(wall.w / 2.0f, wall.h / 2.0f);
-        wallRect.setPosition(wall.x, wall.y);
-        wallRect.setRotation(wall.angle);
-        wallRect.setFillColor(wallDebugColor);
-        m_window.draw(wallRect);
-    }
-
-    // --- DEBUG: Recortes semicirculares en las troneras ---
-    sf::Color cutoutColor(20, 80, 150, 255);
-    float pocketRadiusPixels = m_pocketRadius * 30.0f;
-    for (const auto& pocket : m_pockets) {
-        sf::CircleShape cutout(pocketRadiusPixels);
-        cutout.setOrigin(pocketRadiusPixels, pocketRadiusPixels);
-        cutout.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
-        cutout.setFillColor(cutoutColor);
-        m_window.draw(cutout);
-    }
-
     m_window.draw(m_cocoSprite);    // Luego las frutas
-
-// --- DEBUG: Dibujo de Troneras Provisionales ---
-for (const auto& pocket : m_pockets) {
-    sf::CircleShape debugPocket(m_pocketRadius * 30.0f); // Multiplicamos por la escala
-    debugPocket.setOrigin(m_pocketRadius * 30.0f, m_pocketRadius * 30.0f);
-    
-    // Aquí es la clave: La posición del pocket es la misma que la física
-    debugPocket.setPosition(pocket.x * 30.0f, pocket.y * 30.0f);
-    
-    debugPocket.setFillColor(sf::Color(255, 0, 0, 150)); // Rojo semi-transparente
-    m_window.draw(debugPocket);
-}
-
 
     // Dibuja el resto de las frutas de la mesa
 float SCALE = 30.0f;
