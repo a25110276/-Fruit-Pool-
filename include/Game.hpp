@@ -2,8 +2,10 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <box2d/box2d.h>
+#include <array>
 #include <vector>
 #include <map>
+#include <string>
 
 
 // Enumeración de tipos de frutas
@@ -39,7 +41,7 @@ struct Fruit {
     FruitType type;
     sf::Sprite sprite;
     int currentFrame = 0;
-    float frameTime = 0.0f;
+    float frameTime = 0.1f;
 };
 
 class Game {
@@ -50,6 +52,18 @@ public:
 
 
 private:
+    enum class FruitGroup {
+        NONE,
+        SOLID,
+        STRIPED
+    };
+
+    enum class GamePhase {
+        AIMING,
+        BALLS_MOVING,
+        GAME_OVER
+    };
+
     void processEvents();
     void update();
     void render();
@@ -111,7 +125,7 @@ std::map<FruitType, sf::Texture> m_fruitTextures;
 
 // --- Lógica de Animación ---
 int m_currentFrame = 0;
-float m_frameTime = 0.0f;
+float m_frameTime = 0.1f;
 sf::Clock m_animClock;
 
 
@@ -125,6 +139,15 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 // Nuevas funciones
 void loadAssets();
 void updateAnimation();
+void resolveShotIfReady();
+bool areBallsStopped() const;
+bool hasClearedGroup(int playerIndex) const;
+void switchTurn();
+void assignGroups(FruitGroup pocketedGroup);
+void resetCueBall();
+FruitGroup getFruitGroup(FruitType type) const;
+std::string getGroupName(FruitGroup group) const;
+void updateWindowTitle();
 
 
     // --- Ayudas de apuntado y predicción ---
@@ -133,7 +156,21 @@ void updateAnimation();
     bool predictBallCollision(const sf::Vector2f& origin,
                               const sf::Vector2f& direction,
                               sf::Vector2f& collisionPoint,
+                              sf::Vector2f& fruitCenter,
                               sf::Vector2f& reboundDir,
                               b2BodyId& hitId) const;
+    bool predictWallCollision(const sf::Vector2f& origin,
+                              const sf::Vector2f& direction,
+                              sf::Vector2f& collisionPoint) const;
     std::vector<std::pair<sf::Vector2f, sf::Vector2f>> predictTrajectory(const sf::Vector2f& origin, const sf::Vector2f& direction, int maxBounces = 5) const;
+
+    // --- Fase 7: Reglas y maquina de estados ---
+    GamePhase m_phase = GamePhase::AIMING;
+    int m_currentPlayer = 0;
+    int m_winner = -1;
+    std::array<FruitGroup, 2> m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
+    bool m_cueBallPocketedThisShot = false;
+    bool m_eightBallPocketedThisShot = false;
+    std::vector<FruitGroup> m_shotPocketedGroups;
+    std::string m_statusMessage = "Mesa abierta - Turno del Jugador 1";
 };

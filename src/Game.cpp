@@ -3,6 +3,8 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <sstream>
+#include <algorithm>
 
 
 static const unsigned int WINDOW_WIDTH = 1480;
@@ -28,6 +30,7 @@ Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool 
     initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
     spawnTriangle(); // Llenamos la mesa con el triángulo de frutas al iniciar
     initPockets();   // Configuramos las posiciones de las troneras
+    updateWindowTitle();
 
 
 }
@@ -377,7 +380,7 @@ void Game::processEvents() {
 
         // Evento: Jugador hace Click Izquierdo (Empieza a apuntar/cargar fuerza)
         if (event.type == sf::Event::MouseButtonPressed) {
-            if (event.mouseButton.button == sf::Mouse::Left) {
+            if (event.mouseButton.button == sf::Mouse::Left && m_phase == GamePhase::AIMING && areBallsStopped()) {
                 m_isAiming = true;
                 // Guardamos el punto exacto donde hizo click
                 m_mouseStartPos = sf::Vector2f(event.mouseButton.x, event.mouseButton.y);
@@ -399,6 +402,16 @@ void Game::processEvents() {
 
 
                 // Creamos un vector de fuerza. Multiplicamos por 0.40f para mucho más potencia.
+                if (std::sqrt(deltaX * deltaX + deltaY * deltaY) < 4.0f) {
+                    continue;
+                }
+
+                m_phase = GamePhase::BALLS_MOVING;
+                m_cueBallPocketedThisShot = false;
+                m_eightBallPocketedThisShot = false;
+                m_shotPocketedGroups.clear();
+                updateWindowTitle();
+
                 b2Vec2 impulse = {deltaX * 0.40f, deltaY * 0.40f};
                 
                 // Obtenemos la posición actual de la bola
@@ -417,6 +430,7 @@ void Game::update() {
     updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
     checkPockets();
+    resolveShotIfReady();
     
 }
 
@@ -438,6 +452,7 @@ float Game::dot(const sf::Vector2f& a, const sf::Vector2f& b) const {
 bool Game::predictBallCollision(const sf::Vector2f& origin,
                                  const sf::Vector2f& direction,
                                  sf::Vector2f& collisionPoint,
+                                 sf::Vector2f& fruitCenter,
                                  sf::Vector2f& reboundDir,
                                  b2BodyId& hitId) const {
     const float ballRadiusPixels = 15.0f;
@@ -479,11 +494,84 @@ bool Game::predictBallCollision(const sf::Vector2f& origin,
             found = true;
             hitId = fruit.bodyId;
             collisionPoint = origin + direction * t;
-            sf::Vector2f normal = normalize(collisionPoint - center);
-            reboundDir = normal;
+            fruitCenter = center;
+            reboundDir = normalize(center - collisionPoint);
         }
     }
 
+
+    return found;
+}
+
+
+bool Game::predictWallCollision(const sf::Vector2f& origin,
+                                 const sf::Vector2f& direction,
+                                 sf::Vector2f& collisionPoint) const {
+    const float maxRayDistance = 2000.0f;
+    float closestT = std::numeric_limits<float>::infinity();
+    bool found = false;
+
+    for (const WallRender& wall : m_wallRenders) {
+        float angle = -wall.angle * 3.14159265f / 180.0f;
+        float cosA = std::cos(angle);
+        float sinA = std::sin(angle);
+
+        sf::Vector2f relativeOrigin = origin - sf::Vector2f(wall.x, wall.y);
+        sf::Vector2f localOrigin = {
+            relativeOrigin.x * cosA - relativeOrigin.y * sinA,
+            relativeOrigin.x * sinA + relativeOrigin.y * cosA
+        };
+        sf::Vector2f localDirection = {
+            direction.x * cosA - direction.y * sinA,
+            direction.x * sinA + direction.y * cosA
+        };
+
+        float boundsMin[2] = {
+            -wall.w * 0.5f,
+            -wall.h * 0.5f
+        };
+        float boundsMax[2] = {
+            wall.w * 0.5f,
+            wall.h * 0.5f
+        };
+        float rayStart[2] = {localOrigin.x, localOrigin.y};
+        float rayDir[2] = {localDirection.x, localDirection.y};
+
+        float tMin = 0.0f;
+        float tMax = maxRayDistance;
+        bool intersects = true;
+
+        for (int axis = 0; axis < 2; ++axis) {
+            if (std::abs(rayDir[axis]) < 0.0001f) {
+                if (rayStart[axis] < boundsMin[axis] || rayStart[axis] > boundsMax[axis]) {
+                    intersects = false;
+                    break;
+                }
+            } else {
+                float t1 = (boundsMin[axis] - rayStart[axis]) / rayDir[axis];
+                float t2 = (boundsMax[axis] - rayStart[axis]) / rayDir[axis];
+                if (t1 > t2) {
+                    std::swap(t1, t2);
+                }
+
+                tMin = std::max(tMin, t1);
+                tMax = std::min(tMax, t2);
+                if (tMin > tMax) {
+                    intersects = false;
+                    break;
+                }
+            }
+        }
+
+        if (intersects && tMin > 0.1f && tMin < closestT) {
+            closestT = tMin;
+            found = true;
+        }
+    }
+
+    if (found) {
+        collisionPoint = origin + direction * closestT;
+    }
 
     return found;
 }
@@ -631,7 +719,7 @@ void Game::render() {
     }
    
 // NUEVO: Apuntado avanzado con retroceso y láser grueso
-if (m_isAiming) {
+if (m_isAiming && m_phase == GamePhase::AIMING) {
     // 1. Obtener la posición física central del Coco
     b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
         float pixelX = pos.x * SCALE;
@@ -662,12 +750,27 @@ if (m_isAiming) {
         sf::Vector2f aimEnd = origin + aimDir * 1500.0f;
 
 
-        sf::Vector2f collisionPoint;
-        sf::Vector2f reboundDir;
+        sf::Vector2f fruitCollisionPoint;
+        sf::Vector2f fruitCenter;
+        sf::Vector2f fruitDirection;
         b2BodyId hitId;
-        bool hasCollision = predictBallCollision(origin, aimDir, collisionPoint, reboundDir, hitId);
-        if (hasCollision) {
-            aimEnd = collisionPoint;
+        bool hasFruitCollision = predictBallCollision(origin, aimDir, fruitCollisionPoint, fruitCenter, fruitDirection, hitId);
+
+        sf::Vector2f wallCollisionPoint;
+        bool hasWallCollision = predictWallCollision(origin, aimDir, wallCollisionPoint);
+
+        float fruitDistance = hasFruitCollision
+            ? std::sqrt(dot(fruitCollisionPoint - origin, fruitCollisionPoint - origin))
+            : std::numeric_limits<float>::infinity();
+        float wallDistance = hasWallCollision
+            ? std::sqrt(dot(wallCollisionPoint - origin, wallCollisionPoint - origin))
+            : std::numeric_limits<float>::infinity();
+
+        bool showFruitPrediction = hasFruitCollision && fruitDistance <= wallDistance;
+        if (showFruitPrediction) {
+            aimEnd = fruitCenter;
+        } else if (hasWallCollision) {
+            aimEnd = wallCollisionPoint;
         }
 
 
@@ -680,6 +783,39 @@ if (m_isAiming) {
         aimLine.setRotation(shotAngle);
         aimLine.setFillColor(sf::Color(255, 255, 255, 200));
         m_window.draw(aimLine);
+
+        if (showFruitPrediction) {
+            const float fruitVisualRadius = 17.0f;
+            const float ringGap = 3.5f;
+            const float ringRadius = fruitVisualRadius + ringGap;
+            const float ringThickness = 2.0f;
+            const float shortGuideLength = 32.0f;
+
+            sf::Vector2f guideStart = fruitCenter + fruitDirection * (ringRadius + 2.0f);
+            sf::Vector2f guideEnd = guideStart + fruitDirection * shortGuideLength;
+            float guideAngle = std::atan2(fruitDirection.y, fruitDirection.x) * 180.0f / 3.14159265f;
+
+            sf::CircleShape impactRing(ringRadius);
+            impactRing.setOrigin({ringRadius, ringRadius});
+            impactRing.setPosition(fruitCenter);
+            impactRing.setFillColor(sf::Color::Transparent);
+            impactRing.setOutlineThickness(ringThickness);
+            impactRing.setOutlineColor(sf::Color(255, 220, 80, 230));
+            m_window.draw(impactRing);
+
+            sf::RectangleShape fruitPath({shortGuideLength, 3.0f});
+            fruitPath.setOrigin({0.0f, 1.5f});
+            fruitPath.setPosition(guideStart);
+            fruitPath.setRotation(guideAngle);
+            fruitPath.setFillColor(sf::Color(255, 150, 60, 220));
+            m_window.draw(fruitPath);
+
+            sf::CircleShape fruitPathEnd(3.5f);
+            fruitPathEnd.setOrigin({3.5f, 3.5f});
+            fruitPathEnd.setPosition(guideEnd);
+            fruitPathEnd.setFillColor(sf::Color(255, 150, 60, 220));
+            m_window.draw(fruitPathEnd);
+        }
 
 
         // 5. Dibujar la Caña de Azúcar con Retroceso
@@ -1044,8 +1180,178 @@ void Game::initPockets() {
 }
 
 
+Game::FruitGroup Game::getFruitGroup(FruitType type) const {
+    switch (type) {
+        case LIMA:
+        case LIMON:
+        case TORONJA:
+        case MANDARINA:
+        case NARANJA:
+        case GRANADA:
+        case KIWI:
+            return FruitGroup::STRIPED;
+        case FRESA:
+        case CEREZA:
+        case BLACKBERRY:
+        case FRAMBUESA:
+        case UVA_VERDE:
+        case UVA_MORADA:
+        case MORA_AZUL:
+            return FruitGroup::SOLID;
+        case SANDIA:
+        default:
+            return FruitGroup::NONE;
+    }
+}
+
+
+std::string Game::getGroupName(FruitGroup group) const {
+    switch (group) {
+        case FruitGroup::SOLID:
+            return "citricos";
+        case FruitGroup::STRIPED:
+            return "bayas";
+        case FruitGroup::NONE:
+        default:
+            return "sin grupo";
+    }
+}
+
+
+bool Game::areBallsStopped() const {
+    const float stopSpeed = 0.08f;
+    b2Vec2 cueVelocity = b2Body_GetLinearVelocity(m_cueBallId);
+    if ((cueVelocity.x * cueVelocity.x + cueVelocity.y * cueVelocity.y) > stopSpeed * stopSpeed) {
+        return false;
+    }
+
+    for (const Fruit& fruit : m_fruits) {
+        b2Vec2 velocity = b2Body_GetLinearVelocity(fruit.bodyId);
+        if ((velocity.x * velocity.x + velocity.y * velocity.y) > stopSpeed * stopSpeed) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+bool Game::hasClearedGroup(int playerIndex) const {
+    FruitGroup group = m_playerGroups[playerIndex];
+    if (group == FruitGroup::NONE) {
+        return false;
+    }
+
+    for (const Fruit& fruit : m_fruits) {
+        if (getFruitGroup(fruit.type) == group) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+void Game::switchTurn() {
+    m_currentPlayer = 1 - m_currentPlayer;
+}
+
+
+void Game::assignGroups(FruitGroup pocketedGroup) {
+    if (pocketedGroup == FruitGroup::NONE || m_playerGroups[0] != FruitGroup::NONE) {
+        return;
+    }
+
+    m_playerGroups[m_currentPlayer] = pocketedGroup;
+    m_playerGroups[1 - m_currentPlayer] = (pocketedGroup == FruitGroup::SOLID)
+        ? FruitGroup::STRIPED
+        : FruitGroup::SOLID;
+}
+
+
+void Game::resetCueBall() {
+    b2Body_SetLinearVelocity(m_cueBallId, {0.0f, 0.0f});
+    b2Body_SetAngularVelocity(m_cueBallId, 0.0f);
+    b2Body_SetTransform(m_cueBallId, {485.0f / SCALE, 460.0f / SCALE}, b2MakeRot(0.0f));
+}
+
+
+void Game::resolveShotIfReady() {
+    if (m_phase != GamePhase::BALLS_MOVING || !areBallsStopped()) {
+        return;
+    }
+
+    const int shooter = m_currentPlayer;
+    const int opponent = 1 - m_currentPlayer;
+
+    if (m_eightBallPocketedThisShot) {
+        bool legalEight = hasClearedGroup(shooter) && !m_cueBallPocketedThisShot;
+        m_winner = legalEight ? shooter : opponent;
+        m_phase = GamePhase::GAME_OVER;
+        m_isAiming = false;
+        m_statusMessage = legalEight
+            ? "Jugador " + std::to_string(shooter + 1) + " gana embocando la sandia."
+            : "Jugador " + std::to_string(opponent + 1) + " gana: la sandia cayo antes de tiempo o con falta.";
+        std::cout << m_statusMessage << std::endl;
+        updateWindowTitle();
+        return;
+    }
+
+    if (!m_cueBallPocketedThisShot && !m_shotPocketedGroups.empty() && m_playerGroups[0] == FruitGroup::NONE) {
+        assignGroups(m_shotPocketedGroups.front());
+        std::cout << "Grupos asignados: Jugador 1 = " << getGroupName(m_playerGroups[0])
+                  << ", Jugador 2 = " << getGroupName(m_playerGroups[1]) << std::endl;
+    }
+
+    bool pocketedOwnGroup = false;
+    FruitGroup shooterGroup = m_playerGroups[shooter];
+    for (FruitGroup group : m_shotPocketedGroups) {
+        if ((shooterGroup != FruitGroup::NONE && group == shooterGroup) ||
+            (shooterGroup == FruitGroup::NONE && group != FruitGroup::NONE)) {
+            pocketedOwnGroup = true;
+            break;
+        }
+    }
+
+    if (m_cueBallPocketedThisShot) {
+        switchTurn();
+        m_statusMessage = "Falta: cayo el coco. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+    } else if (!pocketedOwnGroup) {
+        switchTurn();
+        m_statusMessage = "No emboco fruta propia. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+    } else {
+        m_statusMessage = "Jugador " + std::to_string(m_currentPlayer + 1) + " sigue tirando.";
+    }
+
+    m_cueBallPocketedThisShot = false;
+    m_eightBallPocketedThisShot = false;
+    m_shotPocketedGroups.clear();
+    m_phase = GamePhase::AIMING;
+    updateWindowTitle();
+}
+
+
+void Game::updateWindowTitle() {
+    std::ostringstream title;
+    title << "Fruit Pool - Fase 7 | ";
+
+    if (m_phase == GamePhase::GAME_OVER) {
+        title << "Gana Jugador " << (m_winner + 1);
+    } else {
+        title << "Turno Jugador " << (m_currentPlayer + 1);
+        title << " | J1: " << getGroupName(m_playerGroups[0]);
+        title << " | J2: " << getGroupName(m_playerGroups[1]);
+        if (m_phase == GamePhase::BALLS_MOVING) {
+            title << " | bolas en movimiento";
+        }
+    }
+
+    title << " | " << m_statusMessage;
+    m_window.setTitle(title.str());
+}
+
+
 void Game::checkPockets() {
-    float SCALE = 30.0f;
     float dropDistSq = m_pocketRadius * m_pocketRadius; // Distancia al cuadrado
 
 
@@ -1068,6 +1374,13 @@ void Game::checkPockets() {
 
 
         if (pocketed) {
+            FruitGroup pocketedGroup = getFruitGroup(it->type);
+            if (it->type == SANDIA) {
+                m_eightBallPocketedThisShot = true;
+            } else {
+                m_shotPocketedGroups.push_back(pocketedGroup);
+            }
+
             // Destruir el cuerpo físico en Box2D
             b2DestroyBody(it->bodyId);
             // Quitarlo de nuestra lista para no dibujarlo más
@@ -1087,9 +1400,8 @@ void Game::checkPockets() {
         if ((dx * dx + dy * dy) < dropDistSq) {
             // ¡Falta! El Coco entró a la tronera. 
             // Detenemos su movimiento y lo regresamos al punto de saque.
-            b2Body_SetLinearVelocity(m_cueBallId, {0.0f, 0.0f});
-            b2Body_SetAngularVelocity(m_cueBallId, 0.0f);
-            b2Body_SetTransform(m_cueBallId, {485.0f / SCALE, 460.0f / SCALE}, b2MakeRot(0.0f));
+            m_cueBallPocketedThisShot = true;
+            resetCueBall();
             break; // Romper el ciclo porque ya sabemos que cayó
         }
     }
