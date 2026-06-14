@@ -5,6 +5,10 @@
 #include <vector>
 #include <map>
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Enumeración de tipos de frutas
 enum FruitType {
     SANDIA,       // Bola 8
@@ -24,6 +28,10 @@ enum FruitType {
     MORA_AZUL     // Lisa
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Estructura para información de spritesheet de una fruta
 struct FruitSpriteInfo {
     int frameWidth;
@@ -32,6 +40,10 @@ struct FruitSpriteInfo {
     int columns;
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Estructura para una fruta en el juego
 struct Fruit {
     b2BodyId bodyId;
@@ -40,11 +52,16 @@ struct Fruit {
     sf::Texture texture;
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 class Game {
 public:
     Game();
     ~Game(); // Importante: liberar la memoria del mundo físico
     void run();
+
 
 private:
     void processEvents();
@@ -52,20 +69,25 @@ private:
     void render();
     void initPhysics();
 
+
     // --- Variables de Troneras ---
 std::vector<b2Vec2> m_pockets;
 float m_pocketRadius;
 
+
 void initPockets(); // Configura las posiciones de las troneras
 void checkPockets(); // Revisa si alguna bola ha caído en una tronera y la elimina
+
 
 // --- Variables del Triángulo de Frutas ---
 std::vector<Fruit> m_fruits;
 std::map<FruitType, FruitSpriteInfo> m_fruitSpriteInfo;
 void spawnTriangle();
 
+
     // NUEVO: Función modular para crear muros invisibles
     void createWall(float x, float y, float width, float height, float angleDegrees = 0.0f);
+
 
     struct WallRender { float x, y, w, h, angle; };
     std::vector<WallRender> m_wallRenders;
@@ -78,8 +100,10 @@ void spawnTriangle();
     b2WorldId m_worldId;
     b2BodyId m_cueBallId; 
 
+
     // Constante de conversión: 30 píxeles equivalen a 1 metro físico
     const float SCALE = 30.0f;
+
 
 // --- Assets Visuales ---
 sf::Texture m_backgroundTexture;
@@ -91,17 +115,27 @@ sf::Texture m_cocoTexture;
 sf::Sprite m_tableSprite;
 sf::Sprite m_cocoSprite;
 
+
 // --- Assets del Taco ---
 sf::Texture m_cueTexture;
 sf::Sprite m_cueSprite;
 
+<<<<<<< HEAD
 // --- Assets de Frutas ---
 std::map<FruitType, sf::Texture> m_fruitTextures;
 
+=======
+
+// --- Assets de Frutas ---
+std::map<FruitType, sf::Texture> m_fruitTextures;
+
+
+>>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // --- Lógica de Animación ---
 int m_currentFrame = 0;
 float m_frameTime = 0.0f;
 sf::Clock m_animClock;
+
 
     // --- Configuración del Spritesheet del Coco ---
 const int FRAME_WIDTH = 100;  // Ancho de un solo frame
@@ -109,9 +143,11 @@ const int FRAME_HEIGHT = 100; // Alto de un solo frame
 const int TOTAL_FRAMES = 35;  // Total de cuadros en la imagen
 const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 
+
 // Nuevas funciones
 void loadAssets();
 void updateAnimation();
+
 
     // --- Ayudas de apuntado y predicción ---
     sf::Vector2f normalize(const sf::Vector2f& vector) const;

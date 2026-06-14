@@ -1,6 +1,4 @@
 # -Fruit-Pool 🥥🍉-
-
-HOLA WE 
 Este proyecto es una adaptación temática del clásico Billar Bola 8, donde las tradicionales bolas son reemplazadas por coloridas frutas tropicales. Desarrollado en C++ utilizando SFML para el renderizado y Box2D para físicas precisas.
 
 ## 🎯 Objetivo del Juego
