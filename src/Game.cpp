@@ -1,10 +1,10 @@
 #include "Game.hpp"
-#include <iostream> // Para imprimir en consola
+#include <iostream> 
 #include <cmath>
 #include <limits>
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
-Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 4") {
+Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 5") {
     m_window.setFramerateLimit(60);
     loadAssets();
     initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
@@ -40,7 +40,7 @@ void Game::initPhysics() {
     b2ShapeDef shapeDef = b2DefaultShapeDef();
     shapeDef.density = 1.0f;// Densidad del Coco (puedes ajustar para que se sienta más pesado o ligero)
     shapeDef.friction = 0.1f;// Fricción entre la bola y el tapete
-    shapeDef.restitution = 0.9f; // Rebote
+    shapeDef.restitution = 1.0f; // Rebote
 
     b2CreateCircleShape(m_cueBallId, &shapeDef, &dynamicCircle);
     

@@ -19,8 +19,8 @@ private:
 std::vector<b2Vec2> m_pockets;
 float m_pocketRadius;
 
-void initPockets();
-void checkPockets();
+void initPockets(); // Configura las posiciones de las troneras
+void checkPockets(); // Revisa si alguna bola ha caído en una tronera y la elimina
 
 // --- Variables del Triángulo de Frutas ---
 std::vector<b2BodyId> m_fruitIds;
