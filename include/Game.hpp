@@ -3,6 +3,43 @@
 #include <SFML/Graphics.hpp>
 #include <box2d/box2d.h>
 #include <vector>
+#include <map>
+
+// Enumeración de tipos de frutas
+enum FruitType {
+    SANDIA,       // Bola 8
+    LIMA,         // Rallada
+    LIMON,        // Rallada
+    TORONJA,      // Rallada
+    MANDARINA,    // Rallada
+    NARANJA,      // Rallada
+    GRANADA,      // Rallada
+    KIWI,         // Rallada
+    FRESA,        // Lisa
+    CEREZA,       // Lisa
+    BLACKBERRY,   // Lisa
+    FRAMBUESA,    // Lisa
+    UVA_VERDE,    // Lisa
+    UVA_MORADA,   // Lisa
+    MORA_AZUL     // Lisa
+};
+
+// Estructura para información de spritesheet de una fruta
+struct FruitSpriteInfo {
+    int frameWidth;
+    int frameHeight;
+    int totalFrames;
+    int columns;
+};
+
+// Estructura para una fruta en el juego
+struct Fruit {
+    b2BodyId bodyId;
+    FruitType type;
+    sf::Sprite sprite;
+    sf::Texture texture;
+};
+
 class Game {
 public:
     Game();
@@ -23,7 +60,8 @@ void initPockets(); // Configura las posiciones de las troneras
 void checkPockets(); // Revisa si alguna bola ha caído en una tronera y la elimina
 
 // --- Variables del Triángulo de Frutas ---
-std::vector<b2BodyId> m_fruitIds;
+std::vector<Fruit> m_fruits;
+std::map<FruitType, FruitSpriteInfo> m_fruitSpriteInfo;
 void spawnTriangle();
 
     // NUEVO: Función modular para crear muros invisibles
@@ -56,6 +94,9 @@ sf::Sprite m_cocoSprite;
 // --- Assets del Taco ---
 sf::Texture m_cueTexture;
 sf::Sprite m_cueSprite;
+
+// --- Assets de Frutas ---
+std::map<FruitType, sf::Texture> m_fruitTextures;
 
 // --- Lógica de Animación ---
 int m_currentFrame = 0;

@@ -364,8 +364,8 @@ bool Game::predictBallCollision(const sf::Vector2f& origin,
     float closestT = std::numeric_limits<float>::infinity();
     bool found = false;
 
-    for (b2BodyId id : m_fruitIds) {
-        b2Vec2 pos = b2Body_GetPosition(id);
+    for (const Fruit& fruit : m_fruits) {
+        b2Vec2 pos = b2Body_GetPosition(fruit.bodyId);
         sf::Vector2f center = {pos.x * SCALE, pos.y * SCALE};
         sf::Vector2f oc = center - origin;
 
@@ -390,7 +390,7 @@ bool Game::predictBallCollision(const sf::Vector2f& origin,
         if (t < closestT) {
             closestT = t;
             found = true;
-            hitId = id;
+            hitId = fruit.bodyId;
             collisionPoint = origin + direction * t;
             sf::Vector2f normal = normalize(collisionPoint - center);
             reboundDir = normal;
@@ -416,8 +416,8 @@ std::vector<std::pair<sf::Vector2f, sf::Vector2f>> Game::predictTrajectory(const
         sf::Vector2f nextDir = currentDir;
         
         // Detectar colisiones con frutas
-        for (b2BodyId id : m_fruitIds) {
-            b2Vec2 pos = b2Body_GetPosition(id);
+        for (const Fruit& fruit : m_fruits) {
+            b2Vec2 pos = b2Body_GetPosition(fruit.bodyId);
             sf::Vector2f center = {pos.x * SCALE, pos.y * SCALE};
             sf::Vector2f oc = center - currentPos;
             
@@ -529,16 +529,12 @@ void Game::render() {
     m_window.draw(m_cocoSprite);    // Luego las frutas
 
     // Dibuja el resto de las frutas de la mesa
-float SCALE = 30.0f;
-for (b2BodyId id : m_fruitIds) {
-    b2Vec2 pos = b2Body_GetPosition(id);
-    m_cocoSprite.setPosition({pos.x * SCALE, pos.y * SCALE});
-    m_cocoSprite.setColor(sf::Color(255, 100, 100)); // Teñirlas de rojo (Test visual)
-    m_window.draw(m_cocoSprite);
-}
-
-// Resetear el color para que el Coco original (Bola blanca) se dibuje normal
-m_cocoSprite.setColor(sf::Color::White);
+    float SCALE = 30.0f;
+    for (Fruit& fruit : m_fruits) {
+        b2Vec2 pos = b2Body_GetPosition(fruit.bodyId);
+        fruit.sprite.setPosition({pos.x * SCALE, pos.y * SCALE});
+        m_window.draw(fruit.sprite);
+    }
    
 // NUEVO: Apuntado avanzado con retroceso y láser grueso
 if (m_isAiming) {
@@ -710,6 +706,41 @@ void Game::loadAssets() {
     // Diámetro físico (30.0f) / Tamaño del frame en píxeles (100.0f) = Escala de 0.3f
     m_cocoSprite.setScale({34.0f / FRAME_WIDTH, 34.0f / FRAME_HEIGHT});
 
+    // Configurar información de spritesheets para todas las frutas
+    // Asumiendo que todas tienen 100x100 píxeles y 35 frames (7 columnas x 5 filas)
+    m_fruitSpriteInfo[SANDIA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[LIMA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[LIMON] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[TORONJA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[MANDARINA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[NARANJA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[GRANADA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[KIWI] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[FRESA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[CEREZA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[BLACKBERRY] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[FRAMBUESA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[UVA_VERDE] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[UVA_MORADA] = {100, 100, 35, 7};
+    m_fruitSpriteInfo[MORA_AZUL] = {100, 100, 35, 7};
+
+    // Cargar los spritesheets de todas las frutas
+    m_fruitTextures[SANDIA].loadFromFile("assets/images/sandia.png");
+    m_fruitTextures[LIMA].loadFromFile("assets/images/lima.png");
+    m_fruitTextures[LIMON].loadFromFile("assets/images/limon.png");
+    m_fruitTextures[TORONJA].loadFromFile("assets/images/toronja.png");
+    m_fruitTextures[MANDARINA].loadFromFile("assets/images/mandarina.png");
+    m_fruitTextures[NARANJA].loadFromFile("assets/images/naranja.png");
+    m_fruitTextures[GRANADA].loadFromFile("assets/images/granada.png");
+    m_fruitTextures[KIWI].loadFromFile("assets/images/kiwi.png");
+    m_fruitTextures[FRESA].loadFromFile("assets/images/fresa.png");
+    m_fruitTextures[CEREZA].loadFromFile("assets/images/cereza.png");
+    m_fruitTextures[BLACKBERRY].loadFromFile("assets/images/blackberry.png");
+    m_fruitTextures[FRAMBUESA].loadFromFile("assets/images/frambuesa.png");
+    m_fruitTextures[UVA_VERDE].loadFromFile("assets/images/uva_verde.png");
+    m_fruitTextures[UVA_MORADA].loadFromFile("assets/images/uva_morada.png");
+    m_fruitTextures[MORA_AZUL].loadFromFile("assets/images/mora_azul.png");
+
     // 6. Cargar el Taco de Billar
 if (!m_cueTexture.loadFromFile("assets/images/taco.png")) {
     // Manejo de error básico
@@ -758,6 +789,20 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
 }
 
 void Game::spawnTriangle() {
+    // Orden de frutas en el triángulo (5 filas: 1, 2, 3, 4, 5 = 15 total)
+    std::vector<FruitType> fruitOrder = {
+        // Fila 1 (1 fruta): Sandía (bola 8)
+        SANDIA,
+        // Fila 2 (2 frutas)
+        LIMA, LIMON,
+        // Fila 3 (3 frutas)
+        TORONJA, MANDARINA, NARANJA,
+        // Fila 4 (4 frutas)
+        GRANADA, KIWI, FRESA, CEREZA,
+        // Fila 5 (5 frutas)
+        BLACKBERRY, FRAMBUESA, UVA_VERDE, UVA_MORADA, MORA_AZUL
+    };
+
     // Inicio del triángulo
     float SCALE = 30.0f;
     float startX = 995.0f / SCALE;
@@ -772,6 +817,7 @@ void Game::spawnTriangle() {
     // 2. Fórmula matemática exacta para la separación de un hexágono/triángulo
     float rowSpacing = effectiveDiameter * std::sqrt(3.0f) / 2.0f;
 
+    int fruitIndex = 0;
     for (int row = 0; row < 5; ++row) {
         // Calculamos el centro exacto en Y para cada columna
         float firstY = startY - (row * effectiveRadius); 
@@ -799,10 +845,27 @@ void Game::spawnTriangle() {
 
             b2CreateCircleShape(fruitId, &shapeDef, &circle);
 
-            m_fruitIds.push_back(fruitId);
+            // Crear la fruta con tipo específico
+            Fruit fruit;
+            fruit.bodyId = fruitId;
+            fruit.type = fruitOrder[fruitIndex++];
+            
+            // Asignar la textura correspondiente
+            if (m_fruitTextures.find(fruit.type) != m_fruitTextures.end()) {
+                fruit.texture = m_fruitTextures[fruit.type];
+                fruit.sprite.setTexture(fruit.texture);
+            }
+            
+            // Configurar el sprite
+            const FruitSpriteInfo& info = m_fruitSpriteInfo[fruit.type];
+            fruit.sprite.setOrigin({info.frameWidth / 2.0f, info.frameHeight / 2.0f});
+            fruit.sprite.setScale({34.0f / info.frameWidth, 34.0f / info.frameHeight});
+            
+            m_fruits.push_back(fruit);
         }
     }
 }
+
 
 void Game::initPockets() {
     float SCALE = 30.0f; 
@@ -812,12 +875,12 @@ void Game::initPockets() {
 
     // Troneras Superiores (Y = 105)
     m_pockets.push_back({210.0f / SCALE, 185.0f / SCALE});   // Izquierda
-    m_pockets.push_back({740.0f / SCALE, 175.0f / SCALE});   // Centro
+    m_pockets.push_back({740.0f / SCALE, 170.0f / SCALE});   // Centro
     m_pockets.push_back({1270.0f / SCALE, 185.0f / SCALE});  // Derecha
 
     // Troneras Inferiores (Y = 745)
-    m_pockets.push_back({210.0f / SCALE, 745.0f / SCALE});   // Izquierda
-    m_pockets.push_back({740.0f / SCALE, 745.0f / SCALE});   // Centro
+    m_pockets.push_back({210.0f / SCALE, 733.0f / SCALE});   // Izquierda
+    m_pockets.push_back({740.0f / SCALE, 750.0f / SCALE});   // Centro
     m_pockets.push_back({1270.0f / SCALE, 733.0f / SCALE});  // Derecha
 }
 
@@ -826,8 +889,8 @@ void Game::checkPockets() {
     float dropDistSq = m_pocketRadius * m_pocketRadius; // Distancia al cuadrado
 
     // 1. Revisar las frutas (Lisas y Rayadas)
-    for (auto it = m_fruitIds.begin(); it != m_fruitIds.end(); ) {
-        b2Vec2 pos = b2Body_GetPosition(*it);
+    for (auto it = m_fruits.begin(); it != m_fruits.end(); ) {
+        b2Vec2 pos = b2Body_GetPosition(it->bodyId);
         bool pocketed = false;
 
         for (const auto& pocket : m_pockets) {
@@ -843,9 +906,9 @@ void Game::checkPockets() {
 
         if (pocketed) {
             // Destruir el cuerpo físico en Box2D
-            b2DestroyBody(*it);
+            b2DestroyBody(it->bodyId);
             // Quitarlo de nuestra lista para no dibujarlo más
-            it = m_fruitIds.erase(it); 
+            it = m_fruits.erase(it); 
         } else {
             ++it;
         }
