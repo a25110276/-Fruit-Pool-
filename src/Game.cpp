@@ -3,8 +3,13 @@
 #include <cmath>
 #include <limits>
 
+static const unsigned int WINDOW_WIDTH = 1480;
+static const unsigned int WINDOW_HEIGHT = 920;
+static const float WINDOW_CENTER_X = WINDOW_WIDTH / 2.0f;
+static const float WINDOW_CENTER_Y = WINDOW_HEIGHT / 2.0f;
+
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
-Game::Game() : m_window(sf::VideoMode(1280, 720), "Fruit Pool - Fase 5") {
+Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool - Fase 5") {
     m_window.setFramerateLimit(60);
     loadAssets();
     initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
@@ -26,7 +31,7 @@ void Game::initPhysics() {
     // 2. Definir el Coco (Bola blanca dinámica)
     b2BodyDef bodyDef = b2DefaultBodyDef();
     bodyDef.type = b2_dynamicBody;
-    bodyDef.position = {385.0f / SCALE, 360.0f / SCALE}; // Posición inicial del Coco
+    bodyDef.position = {485.0f / SCALE, 460.0f / SCALE}; // Posición inicial del Coco
     bodyDef.linearDamping = 1.2f; // Fricción del tapete
     bodyDef.angularDamping = 0.8f;// Fricción de rotación para que no gire indefinidamente
 
@@ -49,14 +54,14 @@ float wallThickness = 60.0f;
 
 // Horizontales (superior e inferior, se separan para dejar espacio a las esquinas)
 //x, y, width, height
-createWall(385.0f, 73.0f, 423.0f, wallThickness);  // Superior izquierda
-createWall(899.0f, 73.0f, 425.0f, wallThickness);  // Superior derecha
-createWall(384.0f, 646.0f, 423.0f, wallThickness); // Inferior izquierda
-createWall(898.0f, 646.0f, 423.0f, wallThickness); // Inferior derecha
+createWall(485.0f, 173.0f, 423.0f, wallThickness);  // Superior izquierda
+createWall(999.0f, 173.0f, 425.0f, wallThickness);  // Superior derecha
+createWall(484.0f, 746.0f, 423.0f, wallThickness); // Inferior izquierda
+createWall(998.0f, 746.0f, 423.0f, wallThickness); // Inferior derecha
 
 // Verticales (izquierda y derecha, recortadas en los extremos para no afectar el radio de las troneras)
-createWall(96.0f, 360.0f, wallThickness, 425.0f); // Izquierda
-createWall(1185.0f, 358.0f, wallThickness, 427.0f); // Derecha
+createWall(196.0f, 460.0f, wallThickness, 425.0f); // Izquierda
+createWall(1285.0f, 458.0f, wallThickness, 427.0f); // Derecha
 
 // Esquinas ahora con dos cubos iguales en 45 grados, tangencialmente unidos al radio de las troneras
 // Esquinas ahora con bloques rectangulares que pasan por la esquina más cercana del muro.
@@ -71,12 +76,12 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float halfH = blockThickness * 0.5f;
 
     // Coordenadas de los muros que delimitan la esquina (valores exactos según createWall anteriores)
-    float topHorCenterX = 385.0f;
+    float topHorCenterX = 485.0f;
     float topHorWidth = 423.0f;
-    float topHorCenterY = 73.0f;
+    float topHorCenterY = 173.0f;
 
-    float vertLeftCenterX = 96.0f;
-    float vertLeftCenterY = 360.0f;
+    float vertLeftCenterX = 196.0f;
+    float vertLeftCenterY = 460.0f;
     float vertLeftHeight = 425.0f;
 
     // Punto objetivo A: vértice inferior-izquierdo del muro horizontal (queremos que el BR del rectángulo lo toque)
@@ -112,12 +117,12 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float halfW = blockLength * 0.5f;
     float halfH = blockThickness * 0.5f;
 
-    float topHor2CenterX = 899.0f;
+    float topHor2CenterX = 999.0f;
     float topHor2Width = 425.0f;
-    float topHorCenterY2 = 73.0f;
+    float topHorCenterY2 = 173.0f;
 
-    float vertRightCenterX = 1185.0f;
-    float vertRightCenterY = 358.0f;
+    float vertRightCenterX = 1285.0f;
+    float vertRightCenterY = 458.0f;
     float vertRightHeight = 427.0f;
 
     sf::Vector2f targetA;
@@ -149,12 +154,12 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float halfW = blockLength * 0.5f;
     float halfH = blockThickness * 0.5f;
 
-    float bottomHorCenterX = 384.0f;
+    float bottomHorCenterX = 484.0f;
     float bottomHorWidth = 423.0f;
-    float bottomHorCenterY = 646.0f;
+    float bottomHorCenterY = 746.0f;
 
-    float vertLeftCenterX = 96.0f;
-    float vertLeftCenterY = 360.0f;
+    float vertLeftCenterX = 196.0f;
+    float vertLeftCenterY = 460.0f;
     float vertLeftHeight = 425.0f;
 
     sf::Vector2f targetA;
@@ -186,12 +191,12 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float halfW = blockLength * 0.5f;
     float halfH = blockThickness * 0.5f;
 
-    float bottomHor2CenterX = 898.0f;
+    float bottomHor2CenterX = 998.0f;
     float bottomHor2Width = 423.0f;
-    float bottomHor2CenterY = 646.0f;
+    float bottomHor2CenterY = 746.0f;
 
-    float vertRightCenterX = 1185.0f;
-    float vertRightCenterY = 358.0f;
+    float vertRightCenterX = 1285.0f;
+    float vertRightCenterY = 458.0f;
     float vertRightHeight = 427.0f;
 
     sf::Vector2f targetA;
@@ -223,9 +228,9 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float squareSide = blockThickness;
     float halfSide = squareSide * 0.5f;
 
-    float leftGapX = 385.0f + (423.0f * 0.5f);
-    float rightGapX = 899.0f - (425.0f * 0.5f);
-    float topPocketY = 73.0f + (wallThickness * 0.5f);
+    float leftGapX = 485.0f + (423.0f * 0.5f);
+    float rightGapX = 999.0f - (425.0f * 0.5f);
+    float topPocketY = 173.0f + (wallThickness * 0.5f);
 
     sf::Vector2f targetA = {leftGapX, topPocketY};
     sf::Vector2f targetB = {rightGapX, topPocketY};
@@ -255,9 +260,9 @@ float blockThickness = 32.0f; // Grosor del rectángulo
     float squareSide = blockThickness;
     float halfSide = squareSide * 0.5f;
 
-    float leftGapX = 384.0f + (423.0f * 0.5f);
-    float rightGapX = 898.0f - (423.0f * 0.5f);
-    float bottomPocketY = 646.0f - (wallThickness * 0.5f);
+    float leftGapX = 484.0f + (423.0f * 0.5f);
+    float rightGapX = 998.0f - (423.0f * 0.5f);
+    float bottomPocketY = 746.0f - (wallThickness * 0.5f);
 
     sf::Vector2f targetA = {leftGapX, bottomPocketY};
     sf::Vector2f targetB = {rightGapX, bottomPocketY};
@@ -662,8 +667,8 @@ void Game::loadAssets() {
     if (backgroundLoaded) {
         m_backgroundSprite.setTexture(m_backgroundTexture);
         m_backgroundSprite.setOrigin({m_backgroundTexture.getSize().x / 2.0f, m_backgroundTexture.getSize().y / 2.0f});
-        m_backgroundSprite.setPosition({640.0f, 360.0f});
-        m_backgroundSprite.setScale({1280.0f / m_backgroundTexture.getSize().x, 720.0f / m_backgroundTexture.getSize().y});
+        m_backgroundSprite.setPosition({WINDOW_CENTER_X, WINDOW_CENTER_Y});
+        m_backgroundSprite.setScale({WINDOW_WIDTH / static_cast<float>(m_backgroundTexture.getSize().x), WINDOW_HEIGHT / static_cast<float>(m_backgroundTexture.getSize().y)});
     }
 
     // 1.5. Cargar el Marco
@@ -674,7 +679,7 @@ void Game::loadAssets() {
     // Configurar el origen del marco al centro de la imagen
     m_frameSprite.setOrigin(m_frameTexture.getSize().x / 2.0f, m_frameTexture.getSize().y / 2.0f);
     // Posicionar el marco exactamente en el centro de la ventana (mismo que el mantel)
-    m_frameSprite.setPosition(640.0f, 360.0f);
+    m_frameSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y);
     // No escalamos el marco, se dibuja en su tamaño original (1194x683)
 
     // 2. Cargar el Mantel
@@ -685,7 +690,7 @@ void Game::loadAssets() {
     // 1. Configurar el origen del mantel al centro de su imagen real
     m_tableSprite.setOrigin(m_tableTexture.getSize().x / 2.0f, m_tableTexture.getSize().y / 2.0f);
     // 2. Posicionar el mantel exactamente en el centro de la ventana
-    m_tableSprite.setPosition(640.0f, 360.0f);
+    m_tableSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y);
     // 3. Usar el tamaño real del mantel.jpg sin escalar
     m_tableSprite.setScale(1.0f, 1.0f);
 
@@ -755,8 +760,8 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
 void Game::spawnTriangle() {
     // Inicio del triángulo
     float SCALE = 30.0f;
-    float startX = 895.0f / SCALE;
-    float startY = 360.0f / SCALE;
+    float startX = 995.0f / SCALE;
+    float startY = 460.0f / SCALE;
     float radius = 15.0f / SCALE;  // Radio físico real
     
     // 1. EL SECRETO DEL BILLAR VIRTUAL: Un micro-espacio
@@ -806,14 +811,14 @@ void Game::initPockets() {
     m_pocketRadius = 33.0f / SCALE; // Radio de atracción del agujero
 
     // Troneras Superiores (Y = 105)
-    m_pockets.push_back({110.0f / SCALE, 85.0f / SCALE});   // Izquierda
-    m_pockets.push_back({640.0f / SCALE, 75.0f / SCALE});   // Centro
-    m_pockets.push_back({1170.0f / SCALE, 85.0f / SCALE});  // Derecha
+    m_pockets.push_back({210.0f / SCALE, 185.0f / SCALE});   // Izquierda
+    m_pockets.push_back({740.0f / SCALE, 175.0f / SCALE});   // Centro
+    m_pockets.push_back({1270.0f / SCALE, 185.0f / SCALE});  // Derecha
 
-    // Troneras Inferiores (Y = 615)
-    m_pockets.push_back({110.0f / SCALE, 635.0f / SCALE});   // Izquierda
-    m_pockets.push_back({640.0f / SCALE, 645.0f / SCALE});   // Centro
-    m_pockets.push_back({1170.0f / SCALE, 633.0f / SCALE});  // Derecha
+    // Troneras Inferiores (Y = 745)
+    m_pockets.push_back({210.0f / SCALE, 745.0f / SCALE});   // Izquierda
+    m_pockets.push_back({740.0f / SCALE, 745.0f / SCALE});   // Centro
+    m_pockets.push_back({1270.0f / SCALE, 733.0f / SCALE});  // Derecha
 }
 
 void Game::checkPockets() {
@@ -857,7 +862,7 @@ void Game::checkPockets() {
             // Detenemos su movimiento y lo regresamos al punto de saque.
             b2Body_SetLinearVelocity(m_cueBallId, {0.0f, 0.0f});
             b2Body_SetAngularVelocity(m_cueBallId, 0.0f);
-            b2Body_SetTransform(m_cueBallId, {385.0f / SCALE, 360.0f / SCALE}, b2MakeRot(0.0f));
+            b2Body_SetTransform(m_cueBallId, {485.0f / SCALE, 460.0f / SCALE}, b2MakeRot(0.0f));
             break; // Romper el ciclo porque ya sabemos que cayó
         }
     }
