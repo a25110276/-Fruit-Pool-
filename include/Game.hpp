@@ -80,4 +80,5 @@ void updateAnimation();
                               sf::Vector2f& collisionPoint,
                               sf::Vector2f& reboundDir,
                               b2BodyId& hitId) const;
+    std::vector<std::pair<sf::Vector2f, sf::Vector2f>> predictTrajectory(const sf::Vector2f& origin, const sf::Vector2f& direction, int maxBounces = 5) const;
 };
