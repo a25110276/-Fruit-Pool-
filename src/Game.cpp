@@ -580,6 +580,21 @@ if (m_isAiming) {
         aimLine.setFillColor(sf::Color(255, 255, 255, 200));
         m_window.draw(aimLine);
 
+        // Dibujar la línea azul de la trayectoria de la bola golpeada
+        if (hasCollision) {
+            sf::Vector2f trajectoryEnd = collisionPoint + reboundDir * 400.0f; // Línea más corta
+            sf::Vector2f trajectorySegment = trajectoryEnd - collisionPoint;
+            float trajectoryLength = std::sqrt(dot(trajectorySegment, trajectorySegment));
+            float trajectoryAngle = std::atan2(reboundDir.y, reboundDir.x) * 180.0f / 3.14159265f;
+            
+            sf::RectangleShape trajectoryLine({trajectoryLength, 3.0f});
+            trajectoryLine.setOrigin({0.0f, 1.5f});
+            trajectoryLine.setPosition(collisionPoint);
+            trajectoryLine.setRotation(trajectoryAngle);
+            trajectoryLine.setFillColor(sf::Color(100, 150, 255, 180));
+            m_window.draw(trajectoryLine);
+        }
+
         // 5. Dibujar la Caña de Azúcar con Retroceso
         float stickAngle = std::atan2(-pullY, -pullX) * 180.0f / 3.14159265f;
         m_cueSprite.setPosition({pixelX - pullX, pixelY - pullY});
