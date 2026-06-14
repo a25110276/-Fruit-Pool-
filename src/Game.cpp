@@ -2,12 +2,23 @@
 #include <iostream> 
 #include <cmath>
 #include <limits>
+#include <string>
 
 
 static const unsigned int WINDOW_WIDTH = 1480;
 static const unsigned int WINDOW_HEIGHT = 920;
 static const float WINDOW_CENTER_X = WINDOW_WIDTH / 2.0f;
 static const float WINDOW_CENTER_Y = WINDOW_HEIGHT / 2.0f;
+
+static bool loadTexture(sf::Texture& texture, const std::string& path) {
+    if (!texture.loadFromFile(path)) {
+        std::cerr << "No se pudo cargar la imagen: " << path
+                  << "\nEjecuta el juego desde la carpeta raiz del proyecto, donde existe assets/images/."
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
 
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
@@ -435,10 +446,7 @@ bool Game::predictBallCollision(const sf::Vector2f& origin,
     float closestT = std::numeric_limits<float>::infinity();
     bool found = false;
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     for (const Fruit& fruit : m_fruits) {
         b2Vec2 pos = b2Body_GetPosition(fruit.bodyId);
         sf::Vector2f center = {pos.x * SCALE, pos.y * SCALE};
@@ -613,10 +621,7 @@ void Game::render() {
 
     m_window.draw(m_cocoSprite);    // Luego las frutas
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     // Dibuja el resto de las frutas de la mesa
     float SCALE = 30.0f;
     for (Fruit& fruit : m_fruits) {
@@ -767,7 +772,7 @@ void Game::createWall(float x, float y, float width, float height, float angleDe
 
 void Game::loadAssets() {
     // 1. Cargar el Fondo
-    bool backgroundLoaded = m_backgroundTexture.loadFromFile("assets/images/fondo.png");
+    bool backgroundLoaded = loadTexture(m_backgroundTexture, "assets/images/fondo.png");
     if (backgroundLoaded) {
         m_backgroundSprite.setTexture(m_backgroundTexture);
         m_backgroundSprite.setOrigin({m_backgroundTexture.getSize().x / 2.0f, m_backgroundTexture.getSize().y / 2.0f});
@@ -777,7 +782,7 @@ void Game::loadAssets() {
 
 
     // 1.5. Cargar el Marco
-    if (!m_frameTexture.loadFromFile("assets/images/marco.png")) {
+    if (!loadTexture(m_frameTexture, "assets/images/marco.png")) {
         // Manejo de error básico
     }
     m_frameSprite.setTexture(m_frameTexture);
@@ -789,7 +794,7 @@ void Game::loadAssets() {
 
 
     // 2. Cargar el Mantel
-    if (!m_tableTexture.loadFromFile("assets/images/mantel.jpg")) {
+    if (!loadTexture(m_tableTexture, "assets/images/mantel.jpg")) {
         // Manejo de error básico
     }
     m_tableSprite.setTexture(m_tableTexture);
@@ -802,7 +807,7 @@ void Game::loadAssets() {
 
 
     // 4. Cargar el Spritesheet del Coco
-    if (!m_cocoTexture.loadFromFile("assets/images/coco.png")) {
+    if (!loadTexture(m_cocoTexture, "assets/images/coco.png")) {
         // Manejo de error básico
     }
     m_cocoSprite.setTexture(m_cocoTexture);
@@ -818,10 +823,7 @@ void Game::loadAssets() {
     // Diámetro físico (30.0f) / Tamaño del frame en píxeles (100.0f) = Escala de 0.3f
     m_cocoSprite.setScale({34.0f / FRAME_WIDTH, 34.0f / FRAME_HEIGHT});
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     // Configurar información de spritesheets para todas las frutas
     // Asumiendo que todas tienen 100x100 píxeles y 35 frames (7 columnas x 5 filas)
     m_fruitSpriteInfo[SANDIA] = {100, 100, 35, 7};
@@ -840,33 +842,27 @@ void Game::loadAssets() {
     m_fruitSpriteInfo[UVA_MORADA] = {100, 100, 35, 7};
     m_fruitSpriteInfo[MORA_AZUL] = {100, 100, 35, 7};
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     // Cargar los spritesheets de todas las frutas
-    m_fruitTextures[SANDIA].loadFromFile("assets/images/sandia.png");
-    m_fruitTextures[LIMA].loadFromFile("assets/images/lima.png");
-    m_fruitTextures[LIMON].loadFromFile("assets/images/limon.png");
-    m_fruitTextures[TORONJA].loadFromFile("assets/images/toronja.png");
-    m_fruitTextures[MANDARINA].loadFromFile("assets/images/mandarina.png");
-    m_fruitTextures[NARANJA].loadFromFile("assets/images/naranja.png");
-    m_fruitTextures[GRANADA].loadFromFile("assets/images/granada.png");
-    m_fruitTextures[KIWI].loadFromFile("assets/images/kiwi.png");
-    m_fruitTextures[FRESA].loadFromFile("assets/images/fresa.png");
-    m_fruitTextures[CEREZA].loadFromFile("assets/images/cereza.png");
-    m_fruitTextures[BLACKBERRY].loadFromFile("assets/images/blackberry.png");
-    m_fruitTextures[FRAMBUESA].loadFromFile("assets/images/frambuesa.png");
-    m_fruitTextures[UVA_VERDE].loadFromFile("assets/images/uva_verde.png");
-    m_fruitTextures[UVA_MORADA].loadFromFile("assets/images/uva_morada.png");
-    m_fruitTextures[MORA_AZUL].loadFromFile("assets/images/mora_azul.png");
+    loadTexture(m_fruitTextures[SANDIA], "assets/images/sandia.png");
+    loadTexture(m_fruitTextures[LIMA], "assets/images/lima.png");
+    loadTexture(m_fruitTextures[LIMON], "assets/images/limon.png");
+    loadTexture(m_fruitTextures[TORONJA], "assets/images/toronja.png");
+    loadTexture(m_fruitTextures[MANDARINA], "assets/images/mandarina.png");
+    loadTexture(m_fruitTextures[NARANJA], "assets/images/naranja.png");
+    loadTexture(m_fruitTextures[GRANADA], "assets/images/granada.png");
+    loadTexture(m_fruitTextures[KIWI], "assets/images/kiwi.png");
+    loadTexture(m_fruitTextures[FRESA], "assets/images/fresa.png");
+    loadTexture(m_fruitTextures[CEREZA], "assets/images/cereza.png");
+    loadTexture(m_fruitTextures[BLACKBERRY], "assets/images/blackberry.png");
+    loadTexture(m_fruitTextures[FRAMBUESA], "assets/images/frambuesa.png");
+    loadTexture(m_fruitTextures[UVA_VERDE], "assets/images/uva_verde.png");
+    loadTexture(m_fruitTextures[UVA_MORADA], "assets/images/uva_morada.png");
+    loadTexture(m_fruitTextures[MORA_AZUL], "assets/images/mora_azul.png");
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     // 6. Cargar el Taco de Billar
-if (!m_cueTexture.loadFromFile("assets/images/taco.png")) {
+if (!loadTexture(m_cueTexture, "assets/images/taco.png")) {
     // Manejo de error básico
 }
 m_cueSprite.setTexture(m_cueTexture);
@@ -886,12 +882,12 @@ m_cueSprite.setScale({0.5f, 0.5f});
 
 
 void Game::updateAnimation() {
+    float deltaTime = m_animClock.restart().asSeconds();
     b2Vec2 velocity = b2Body_GetLinearVelocity(m_cueBallId);
     float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
 
 
     if (speed > 0.5f) {
-        float deltaTime = m_animClock.restart().asSeconds();
         m_frameTime += deltaTime;
 
 
@@ -909,8 +905,6 @@ void Game::updateAnimation() {
             m_cocoSprite.setTextureRect(sf::IntRect({col * FRAME_WIDTH, row * FRAME_HEIGHT}, {FRAME_WIDTH, FRAME_HEIGHT}));
             m_frameTime = 0.0f;
         }
-    } else {
-        m_animClock.restart();
     }
 
 
@@ -919,6 +913,25 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
     float SCALE = 30.0f; // Nuestra constante de conversión
     
     m_cocoSprite.setPosition({pos.x * SCALE, pos.y * SCALE});
+
+    for (Fruit& fruit : m_fruits) {
+        b2Vec2 fruitVelocity = b2Body_GetLinearVelocity(fruit.bodyId);
+        float fruitSpeed = std::sqrt(fruitVelocity.x * fruitVelocity.x + fruitVelocity.y * fruitVelocity.y);
+        const FruitSpriteInfo& info = m_fruitSpriteInfo[fruit.type];
+
+        if (fruitSpeed > 0.5f) {
+            fruit.frameTime += deltaTime;
+
+            if (fruit.frameTime >= 0.05f) {
+                fruit.currentFrame = (fruit.currentFrame + 1) % info.totalFrames;
+                fruit.frameTime = 0.0f;
+            }
+        }
+
+        int row = fruit.currentFrame / info.columns;
+        int col = fruit.currentFrame % info.columns;
+        fruit.sprite.setTextureRect(sf::IntRect({col * info.frameWidth, row * info.frameHeight}, {info.frameWidth, info.frameHeight}));
+    }
 }
 
 
@@ -937,10 +950,7 @@ void Game::spawnTriangle() {
         BLACKBERRY, FRAMBUESA, UVA_VERDE, UVA_MORADA, MORA_AZUL
     };
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     // Inicio del triángulo
     float SCALE = 30.0f;
     float startX = 995.0f / SCALE;
@@ -955,10 +965,7 @@ void Game::spawnTriangle() {
     // 2. Fórmula matemática exacta para la separación de un hexágono/triángulo
     float rowSpacing = effectiveDiameter * std::sqrt(3.0f) / 2.0f;
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
     int fruitIndex = 0;
     for (int row = 0; row < 5; ++row) {
         // Calculamos el centro exacto en Y para cada columna
@@ -992,10 +999,7 @@ void Game::spawnTriangle() {
 
             b2CreateCircleShape(fruitId, &shapeDef, &circle);
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
             // Crear la fruta con tipo específico
             Fruit fruit;
             fruit.bodyId = fruitId;
@@ -1003,12 +1007,12 @@ void Game::spawnTriangle() {
             
             // Asignar la textura correspondiente
             if (m_fruitTextures.find(fruit.type) != m_fruitTextures.end()) {
-                fruit.texture = m_fruitTextures[fruit.type];
-                fruit.sprite.setTexture(fruit.texture);
+                fruit.sprite.setTexture(m_fruitTextures[fruit.type]);
             }
             
             // Configurar el sprite
             const FruitSpriteInfo& info = m_fruitSpriteInfo[fruit.type];
+            fruit.sprite.setTextureRect(sf::IntRect({0, 0}, {info.frameWidth, info.frameHeight}));
             fruit.sprite.setOrigin({info.frameWidth / 2.0f, info.frameHeight / 2.0f});
             fruit.sprite.setScale({34.0f / info.frameWidth, 34.0f / info.frameHeight});
             
@@ -1018,10 +1022,7 @@ void Game::spawnTriangle() {
 }
 
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 void Game::initPockets() {
     float SCALE = 30.0f; 
     m_pockets.clear();

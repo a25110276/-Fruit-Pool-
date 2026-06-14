@@ -5,10 +5,7 @@
 #include <vector>
 #include <map>
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Enumeración de tipos de frutas
 enum FruitType {
     SANDIA,       // Bola 8
@@ -28,10 +25,6 @@ enum FruitType {
     MORA_AZUL     // Lisa
 };
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Estructura para información de spritesheet de una fruta
 struct FruitSpriteInfo {
     int frameWidth;
@@ -40,22 +33,15 @@ struct FruitSpriteInfo {
     int columns;
 };
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // Estructura para una fruta en el juego
 struct Fruit {
     b2BodyId bodyId;
     FruitType type;
     sf::Sprite sprite;
-    sf::Texture texture;
+    int currentFrame = 0;
+    float frameTime = 0.0f;
 };
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 class Game {
 public:
     Game();
@@ -120,17 +106,9 @@ sf::Sprite m_cocoSprite;
 sf::Texture m_cueTexture;
 sf::Sprite m_cueSprite;
 
-<<<<<<< HEAD
 // --- Assets de Frutas ---
 std::map<FruitType, sf::Texture> m_fruitTextures;
 
-=======
-
-// --- Assets de Frutas ---
-std::map<FruitType, sf::Texture> m_fruitTextures;
-
-
->>>>>>> 42ac76739dff94199927ea71fa3805c82090e2da
 // --- Lógica de Animación ---
 int m_currentFrame = 0;
 float m_frameTime = 0.0f;
