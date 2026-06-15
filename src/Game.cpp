@@ -13,6 +13,7 @@ static const unsigned int WINDOW_WIDTH = 1480;
 static const unsigned int WINDOW_HEIGHT = 920;
 static const float WINDOW_CENTER_X = WINDOW_WIDTH / 2.0f;
 static const float WINDOW_CENTER_Y = WINDOW_HEIGHT / 2.0f;
+static const float TABLE_OFFSET_Y = 60.0f;
 
 static bool loadTexture(sf::Texture& texture, const std::string& path) {
     if (!texture.loadFromFile(path)) {
@@ -76,7 +77,7 @@ void Game::initPhysics() {
     // 2. Definir el Coco (Bola blanca dinámica)
     b2BodyDef bodyDef = b2DefaultBodyDef();
     bodyDef.type = b2_dynamicBody;
-    bodyDef.position = {485.0f / SCALE, 460.0f / SCALE}; // Posición inicial del Coco
+    bodyDef.position = {485.0f / SCALE, (460.0f + TABLE_OFFSET_Y) / SCALE}; // Posición inicial del Coco
     bodyDef.linearDamping = 1.2f; // Fricción del tapete
     bodyDef.angularDamping = 0.8f;// Fricción de rotación para que no gire indefinidamente
 
@@ -941,6 +942,8 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
 
 
 void Game::createWall(float x, float y, float width, float height, float angleDegrees) {
+    y += TABLE_OFFSET_Y;
+
     b2BodyDef bodyDef = b2DefaultBodyDef();
     bodyDef.type = b2_staticBody; // Estático: inamovible como una pared
     // Box2D ubica los rectángulos desde su centro, por eso dividimos entre SCALE
@@ -997,7 +1000,7 @@ void Game::loadAssets() {
     // Configurar el origen del marco al centro de la imagen
     m_frameSprite.setOrigin(m_frameTexture.getSize().x / 2.0f, m_frameTexture.getSize().y / 2.0f);
     // Posicionar el marco exactamente en el centro de la ventana (mismo que el mantel)
-    m_frameSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y);
+    m_frameSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y + TABLE_OFFSET_Y);
     // No escalamos el marco, se dibuja en su tamaño original (1194x683)
 
 
@@ -1009,7 +1012,7 @@ void Game::loadAssets() {
     // 1. Configurar el origen del mantel al centro de su imagen real
     m_tableSprite.setOrigin(m_tableTexture.getSize().x / 2.0f, m_tableTexture.getSize().y / 2.0f);
     // 2. Posicionar el mantel exactamente en el centro de la ventana
-    m_tableSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y);
+    m_tableSprite.setPosition(WINDOW_CENTER_X, WINDOW_CENTER_Y + TABLE_OFFSET_Y);
     // 3. Usar el tamaño real del mantel.jpg sin escalar
     m_tableSprite.setScale(1.0f, 1.0f);
 
@@ -1392,7 +1395,7 @@ void Game::spawnTriangle() {
     // Inicio del triángulo
     float SCALE = 30.0f;
     float startX = 995.0f / SCALE;
-    float startY = 460.0f / SCALE;
+    float startY = (460.0f + TABLE_OFFSET_Y) / SCALE;
     float radius = 15.0f / SCALE;  // Radio físico real
     
     // 1. EL SECRETO DEL BILLAR VIRTUAL: Un micro-espacio
@@ -1470,15 +1473,15 @@ void Game::initPockets() {
 
 
     // Troneras Superiores (Y = 105)
-    m_pockets.push_back({210.0f / SCALE, 185.0f / SCALE});   // Izquierda
-    m_pockets.push_back({740.0f / SCALE, 170.0f / SCALE});   // Centro
-    m_pockets.push_back({1270.0f / SCALE, 185.0f / SCALE});  // Derecha
+    m_pockets.push_back({210.0f / SCALE, (185.0f + TABLE_OFFSET_Y) / SCALE});   // Izquierda
+    m_pockets.push_back({740.0f / SCALE, (170.0f + TABLE_OFFSET_Y) / SCALE});   // Centro
+    m_pockets.push_back({1270.0f / SCALE, (185.0f + TABLE_OFFSET_Y) / SCALE});  // Derecha
 
 
     // Troneras Inferiores (Y = 745)
-    m_pockets.push_back({210.0f / SCALE, 733.0f / SCALE});   // Izquierda
-    m_pockets.push_back({740.0f / SCALE, 750.0f / SCALE});   // Centro
-    m_pockets.push_back({1270.0f / SCALE, 733.0f / SCALE});  // Derecha
+    m_pockets.push_back({210.0f / SCALE, (733.0f + TABLE_OFFSET_Y) / SCALE});   // Izquierda
+    m_pockets.push_back({740.0f / SCALE, (750.0f + TABLE_OFFSET_Y) / SCALE});   // Centro
+    m_pockets.push_back({1270.0f / SCALE, (733.0f + TABLE_OFFSET_Y) / SCALE});  // Derecha
 }
 
 
@@ -1576,7 +1579,7 @@ void Game::assignGroups(FruitGroup pocketedGroup) {
 void Game::resetCueBall() {
     b2Body_SetLinearVelocity(m_cueBallId, {0.0f, 0.0f});
     b2Body_SetAngularVelocity(m_cueBallId, 0.0f);
-    b2Body_SetTransform(m_cueBallId, {485.0f / SCALE, 460.0f / SCALE}, b2MakeRot(0.0f));
+    b2Body_SetTransform(m_cueBallId, {485.0f / SCALE, (460.0f + TABLE_OFFSET_Y) / SCALE}, b2MakeRot(0.0f));
 }
 
 
@@ -1713,5 +1716,6 @@ void Game::checkPockets() {
     }
    
 }
+
 
 
