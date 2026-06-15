@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <fstream>
 
 
 static const unsigned int WINDOW_WIDTH = 1480;
@@ -22,14 +23,37 @@ static bool loadTexture(sf::Texture& texture, const std::string& path) {
     return true;
 }
 
+static bool loadOptionalTexture(sf::Texture& texture, const std::string& path) {
+    if (!std::ifstream(path).good()) {
+        return false;
+    }
+
+    return texture.loadFromFile(path);
+}
+
+static bool loadSoundBuffer(sf::SoundBuffer& buffer, const std::string& path) {
+    if (!std::ifstream(path).good()) {
+        std::cerr << "No se pudo cargar el audio: " << path << std::endl;
+        return false;
+    }
+
+    if (!buffer.loadFromFile(path)) {
+        std::cerr << "No se pudo cargar el audio: " << path << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
-Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool - Fase 5") {
+Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool - Fase 8") {
     m_window.setFramerateLimit(60);
     loadAssets();
     initPhysics();// 1. Inicializar el mundo físico de Box2D y sus bandas
     spawnTriangle(); // Llenamos la mesa con el triángulo de frutas al iniciar
     initPockets();   // Configuramos las posiciones de las troneras
+    resetTurnTimer();
     updateWindowTitle();
 
 
@@ -410,6 +434,7 @@ void Game::processEvents() {
                 m_cueBallPocketedThisShot = false;
                 m_eightBallPocketedThisShot = false;
                 m_shotPocketedGroups.clear();
+                playCueHitSound();
                 updateWindowTitle();
 
                 b2Vec2 impulse = {deltaX * 0.40f, deltaY * 0.40f};
@@ -429,8 +454,10 @@ void Game::update() {
     // Calculamos el siguiente frame físico
     updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
+    checkCollisionAudio();
     checkPockets();
     resolveShotIfReady();
+    updateTurnTimer();
     
 }
 
@@ -704,7 +731,6 @@ void Game::render() {
     // Dibujar el fondo primero, luego el mantel atrás del marco y después las frutas
     m_window.draw(m_backgroundSprite);
     m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
-    m_window.draw(m_frameSprite);   // Marco encima del mantel
 
 
     m_window.draw(m_cocoSprite);    // Luego las frutas
@@ -886,6 +912,8 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
         barBorder.setOutlineColor(sf::Color::White);
         m_window.draw(barBorder);
     }
+    m_window.draw(m_frameSprite);
+    drawHUD();
     m_window.display();
 }
 
@@ -1024,8 +1052,188 @@ m_cueSprite.setOrigin({0.0f, tacoHeight / 2.0f});
 // Opcional: Ajustar la escala si tu imagen del taco es muy grande
 m_cueSprite.setScale({0.5f, 0.5f});
 
+    m_hudFontLoaded =
+        m_hudFont.loadFromFile("assets/fonts/hud.ttf") ||
+        m_hudFont.loadFromFile("C:/Windows/Fonts/arial.ttf");
+    if (!m_hudFontLoaded) {
+        std::cerr << "No se pudo cargar fuente para HUD. Agrega assets/fonts/hud.ttf." << std::endl;
+    }
+
+    for (std::size_t i = 0; i < m_avatarTextures.size(); ++i) {
+        std::string path = "assets/avatars/avatar_" + std::to_string(i + 1) + ".png";
+        m_avatarLoaded[i] = loadOptionalTexture(m_avatarTextures[i], path);
+    }
+
+    m_cueHitLoaded = loadSoundBuffer(m_cueHitBuffer, "assets/music/golpe_taco.ogg");
+    if (m_cueHitLoaded) {
+        m_cueHitSound.setBuffer(m_cueHitBuffer);
+        m_cueHitSound.setVolume(70.0f);
+    }
+
+    m_fruitCollisionLoaded = loadSoundBuffer(m_fruitCollisionBuffer, "assets/music/choque_frutas.ogg");
+    if (m_fruitCollisionLoaded) {
+        m_fruitCollisionSound.setBuffer(m_fruitCollisionBuffer);
+        m_fruitCollisionSound.setVolume(55.0f);
+    }
 
 
+
+}
+
+
+void Game::drawHUD() {
+    sf::RectangleShape topPanel({static_cast<float>(WINDOW_WIDTH), 118.0f});
+    topPanel.setPosition({0.0f, 0.0f});
+    topPanel.setFillColor(sf::Color(20, 28, 34, 215));
+    m_window.draw(topPanel);
+
+    sf::RectangleShape bottomPanel({static_cast<float>(WINDOW_WIDTH), 118.0f});
+    bottomPanel.setPosition({0.0f, 802.0f});
+    bottomPanel.setFillColor(sf::Color(18, 23, 28, 225));
+    m_window.draw(bottomPanel);
+
+    auto drawText = [&](const std::string& value, unsigned int size, sf::Vector2f pos, sf::Color color) {
+        if (!m_hudFontLoaded) {
+            return;
+        }
+
+        sf::Text text(value, m_hudFont, size);
+        text.setPosition(pos);
+        text.setFillColor(color);
+        text.setStyle(sf::Text::Bold);
+        m_window.draw(text);
+    };
+
+    auto drawPlayerPanel = [&](int playerIndex, sf::Vector2f pos) {
+        bool active = playerIndex == m_currentPlayer && m_phase != GamePhase::GAME_OVER;
+        sf::RectangleShape panel({420.0f, 88.0f});
+        panel.setPosition(pos);
+        panel.setFillColor(active ? sf::Color(48, 90, 78, 235) : sf::Color(36, 44, 50, 225));
+        panel.setOutlineThickness(2.0f);
+        panel.setOutlineColor(active ? sf::Color(245, 210, 95) : sf::Color(95, 105, 110));
+        m_window.draw(panel);
+
+        int avatarIndex = std::max(1, std::min(6, m_playerAvatarID[playerIndex])) - 1;
+        sf::FloatRect avatarRect(pos.x + 16.0f, pos.y + 12.0f, 64.0f, 64.0f);
+        if (m_avatarLoaded[avatarIndex]) {
+            sf::Sprite avatar;
+            avatar.setTexture(m_avatarTextures[avatarIndex]);
+            sf::Vector2u size = m_avatarTextures[avatarIndex].getSize();
+            avatar.setScale({avatarRect.width / static_cast<float>(size.x), avatarRect.height / static_cast<float>(size.y)});
+            avatar.setPosition({avatarRect.left, avatarRect.top});
+            m_window.draw(avatar);
+        } else {
+            sf::CircleShape placeholder(32.0f);
+            placeholder.setPosition({avatarRect.left, avatarRect.top});
+            placeholder.setFillColor(playerIndex == 0 ? sf::Color(235, 104, 82) : sf::Color(84, 158, 225));
+            placeholder.setOutlineThickness(2.0f);
+            placeholder.setOutlineColor(sf::Color::White);
+            m_window.draw(placeholder);
+        }
+
+        drawText("Jugador " + std::to_string(playerIndex + 1), 24, {pos.x + 98.0f, pos.y + 14.0f}, sf::Color::White);
+        drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 18, {pos.x + 98.0f, pos.y + 48.0f}, sf::Color(220, 230, 230));
+        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, sf::Color(245, 210, 95));
+    };
+
+    drawPlayerPanel(0, {24.0f, 15.0f});
+    drawPlayerPanel(1, {1036.0f, 15.0f});
+
+    sf::RectangleShape timerBox({230.0f, 74.0f});
+    timerBox.setPosition({625.0f, 22.0f});
+    timerBox.setFillColor(sf::Color(12, 17, 21, 235));
+    timerBox.setOutlineThickness(2.0f);
+    timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : sf::Color(245, 210, 95));
+    m_window.draw(timerBox);
+
+    drawText("Turno J" + std::to_string(m_currentPlayer + 1), 18, {666.0f, 30.0f}, sf::Color(220, 230, 230));
+    int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
+    drawText(std::to_string(seconds) + "s", 34, {704.0f, 54.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
+
+    drawText(m_statusMessage, 22, {34.0f, 824.0f}, sf::Color::White);
+    drawText("J1: " + getGroupName(m_playerGroups[0]) + "   J2: " + getGroupName(m_playerGroups[1]), 16, {34.0f, 860.0f}, sf::Color(190, 205, 205));
+}
+
+
+void Game::resetTurnTimer() {
+    m_turnTimeRemaining = 30.0f;
+    m_turnClock.restart();
+}
+
+
+void Game::updateTurnTimer() {
+    float elapsed = m_turnClock.restart().asSeconds();
+    if (m_phase != GamePhase::AIMING || !areBallsStopped()) {
+        return;
+    }
+
+    m_turnTimeRemaining -= elapsed;
+    if (m_turnTimeRemaining > 0.0f) {
+        return;
+    }
+
+    m_isAiming = false;
+    switchTurn();
+    m_statusMessage = "Tiempo agotado. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+    updateWindowTitle();
+}
+
+
+void Game::playCueHitSound() {
+    if (m_cueHitLoaded) {
+        m_cueHitSound.play();
+    }
+}
+
+
+void Game::playFruitCollisionSound() {
+    if (!m_fruitCollisionLoaded || m_collisionSoundClock.getElapsedTime().asSeconds() < 0.12f) {
+        return;
+    }
+
+    m_fruitCollisionSound.play();
+    m_collisionSoundClock.restart();
+}
+
+
+void Game::checkCollisionAudio() {
+    if (!m_fruitCollisionLoaded || m_phase == GamePhase::AIMING) {
+        return;
+    }
+
+    const float collisionDistance = 32.0f / SCALE;
+    const float collisionDistanceSq = collisionDistance * collisionDistance;
+    const float velocityThreshold = 3.2f;
+    b2Vec2 cuePos = b2Body_GetPosition(m_cueBallId);
+    b2Vec2 cueVel = b2Body_GetLinearVelocity(m_cueBallId);
+
+    for (std::size_t i = 0; i < m_fruits.size(); ++i) {
+        b2Vec2 fruitPos = b2Body_GetPosition(m_fruits[i].bodyId);
+        b2Vec2 fruitVel = b2Body_GetLinearVelocity(m_fruits[i].bodyId);
+        float cueDx = cuePos.x - fruitPos.x;
+        float cueDy = cuePos.y - fruitPos.y;
+        float relCueX = cueVel.x - fruitVel.x;
+        float relCueY = cueVel.y - fruitVel.y;
+        float cueRelSpeed = std::sqrt(relCueX * relCueX + relCueY * relCueY);
+        if ((cueDx * cueDx + cueDy * cueDy) <= collisionDistanceSq && cueRelSpeed >= velocityThreshold) {
+            playFruitCollisionSound();
+            return;
+        }
+
+        for (std::size_t j = i + 1; j < m_fruits.size(); ++j) {
+            b2Vec2 otherPos = b2Body_GetPosition(m_fruits[j].bodyId);
+            b2Vec2 otherVel = b2Body_GetLinearVelocity(m_fruits[j].bodyId);
+            float dx = fruitPos.x - otherPos.x;
+            float dy = fruitPos.y - otherPos.y;
+            float relX = fruitVel.x - otherVel.x;
+            float relY = fruitVel.y - otherVel.y;
+            float relSpeed = std::sqrt(relX * relX + relY * relY);
+            if ((dx * dx + dy * dy) <= collisionDistanceSq && relSpeed >= velocityThreshold) {
+                playFruitCollisionSound();
+                return;
+            }
+        }
+    }
 }
 
 
@@ -1266,6 +1474,8 @@ bool Game::hasClearedGroup(int playerIndex) const {
 
 void Game::switchTurn() {
     m_currentPlayer = 1 - m_currentPlayer;
+    m_isPlayer1Turn = (m_currentPlayer == 0);
+    resetTurnTimer();
 }
 
 
@@ -1299,6 +1509,7 @@ void Game::resolveShotIfReady() {
     if (m_eightBallPocketedThisShot) {
         bool legalEight = hasClearedGroup(shooter) && !m_cueBallPocketedThisShot;
         m_winner = legalEight ? shooter : opponent;
+        m_playerWins[m_winner]++;
         m_phase = GamePhase::GAME_OVER;
         m_isAiming = false;
         m_statusMessage = legalEight
@@ -1332,6 +1543,7 @@ void Game::resolveShotIfReady() {
         switchTurn();
         m_statusMessage = "No emboco fruta propia. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
     } else {
+        resetTurnTimer();
         m_statusMessage = "Jugador " + std::to_string(m_currentPlayer + 1) + " sigue tirando.";
     }
 
@@ -1345,7 +1557,7 @@ void Game::resolveShotIfReady() {
 
 void Game::updateWindowTitle() {
     std::ostringstream title;
-    title << "Fruit Pool - Fase 7 | ";
+    title << "Fruit Pool - Fase 8 | ";
 
     if (m_phase == GamePhase::GAME_OVER) {
         title << "Gana Jugador " << (m_winner + 1);

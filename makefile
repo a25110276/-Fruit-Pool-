@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Iinclude -IC:/msys64/mingw64/include
-LDFLAGS = -LC:/msys64/mingw64/lib -lsfml-graphics -lsfml-window -lsfml-system -lbox2d
+LDFLAGS = -LC:/msys64/mingw64/lib -lsfml-graphics -lsfml-window -lsfml-audio -lsfml-system -lbox2d
 
 SRC_DIR = src
 BIN_DIR = bin

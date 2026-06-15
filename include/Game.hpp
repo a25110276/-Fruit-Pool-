@@ -1,6 +1,7 @@
 
 #pragma once
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <box2d/box2d.h>
 #include <array>
 #include <vector>
@@ -138,11 +139,17 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 
 // Nuevas funciones
 void loadAssets();
+void drawHUD();
 void updateAnimation();
+void updateTurnTimer();
+void playCueHitSound();
+void playFruitCollisionSound();
+void checkCollisionAudio();
 void resolveShotIfReady();
 bool areBallsStopped() const;
 bool hasClearedGroup(int playerIndex) const;
 void switchTurn();
+void resetTurnTimer();
 void assignGroups(FruitGroup pocketedGroup);
 void resetCueBall();
 FruitGroup getFruitGroup(FruitType type) const;
@@ -167,10 +174,30 @@ void updateWindowTitle();
     // --- Fase 7: Reglas y maquina de estados ---
     GamePhase m_phase = GamePhase::AIMING;
     int m_currentPlayer = 0;
+    bool m_isPlayer1Turn = true;
     int m_winner = -1;
     std::array<FruitGroup, 2> m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
     bool m_cueBallPocketedThisShot = false;
     bool m_eightBallPocketedThisShot = false;
     std::vector<FruitGroup> m_shotPocketedGroups;
     std::string m_statusMessage = "Mesa abierta - Turno del Jugador 1";
+
+    // --- Fase 8: HUD ---
+    sf::Font m_hudFont;
+    bool m_hudFontLoaded = false;
+    std::array<sf::Texture, 6> m_avatarTextures;
+    std::array<bool, 6> m_avatarLoaded = {false, false, false, false, false, false};
+    std::array<int, 2> m_playerAvatarID = {1, 2};
+    std::array<int, 2> m_playerWins = {0, 0};
+    sf::Clock m_turnClock;
+    float m_turnTimeRemaining = 30.0f;
+
+    // --- Fase 8: Audio ---
+    sf::SoundBuffer m_cueHitBuffer;
+    sf::SoundBuffer m_fruitCollisionBuffer;
+    sf::Sound m_cueHitSound;
+    sf::Sound m_fruitCollisionSound;
+    bool m_cueHitLoaded = false;
+    bool m_fruitCollisionLoaded = false;
+    sf::Clock m_collisionSoundClock;
 };
