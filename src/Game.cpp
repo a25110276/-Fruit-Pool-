@@ -901,7 +901,7 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
 
         if (showFruitPrediction) {
             const float fruitRadiusPixels = 15.0f;
-            const float ringRadius = 15.0f;
+            const float ringRadius = 11.0f;
             const float ringThickness = 2.0f;
             const float shortGuideLength = 28.0f;
             const float reboundLineLength = 40.0f;
@@ -1387,8 +1387,11 @@ void Game::drawCenteredMenuPanel() {
 
     if (m_menuPanelView == 1) {
         drawText("Reglas", 22, {panelPos.x + 42.0f, panelPos.y + 254.0f}, sf::Color(178, 226, 178));
-        drawText("Emboca tu grupo, evita faltas y deja la sandia para el final.", 14, {panelPos.x + 42.0f, panelPos.y + 292.0f}, sf::Color::White);
-        drawText("Si se acaba el tiempo, el turno pasa al oponente.", 14, {panelPos.x + 42.0f, panelPos.y + 320.0f}, sf::Color::White);
+        drawText("Cada jugador tendra que meter las 7 frutas,", 13, {panelPos.x + 42.0f, panelPos.y + 286.0f}, sf::Color::White);
+        drawText("ya sean citricos o bayas.", 13, {panelPos.x + 42.0f, panelPos.y + 310.0f}, sf::Color::White);
+        drawText("Gana quien anote sus 7 piezas mas la sandia (bola 8).", 13, {panelPos.x + 42.0f, panelPos.y + 334.0f}, sf::Color::White);
+        drawText("Respeta los turnos y manten la precision", 13, {panelPos.x + 42.0f, panelPos.y + 358.0f}, sf::Color::White);
+        drawText("y estrategia durante toda la partida. 🍉", 13, {panelPos.x + 42.0f, panelPos.y + 382.0f}, sf::Color::White);
     } else if (m_menuPanelView == 2) {
         drawText("Creditos", 22, {panelPos.x + 42.0f, panelPos.y + 254.0f}, sf::Color(178, 226, 178));
         drawText("Fruit Pool", 14, {panelPos.x + 42.0f, panelPos.y + 292.0f}, sf::Color::White);
@@ -1710,21 +1713,22 @@ void Game::checkWallBounceAudio() {
 
     const float ballRadius = 16.0f;
     const float speedThreshold = 4.0f;
-    for (const Fruit& fruit : m_fruits) {
-        b2Vec2 velocity = b2Body_GetLinearVelocity(fruit.bodyId);
+
+    auto checkBodyWallBounce = [&](b2BodyId bodyId) -> bool {
+        b2Vec2 velocity = b2Body_GetLinearVelocity(bodyId);
         float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
         if (speed < speedThreshold) {
-            continue;
+            return false;
         }
 
-        b2Vec2 position = b2Body_GetPosition(fruit.bodyId);
-        sf::Vector2f fruitCenter(position.x * SCALE, position.y * SCALE);
+        b2Vec2 position = b2Body_GetPosition(bodyId);
+        sf::Vector2f bodyCenter(position.x * SCALE, position.y * SCALE);
 
         for (const WallRender& wall : m_wallRenders) {
             float angle = -wall.angle * 3.14159265f / 180.0f;
             float cosA = std::cos(angle);
             float sinA = std::sin(angle);
-            sf::Vector2f relative = fruitCenter - sf::Vector2f(wall.x, wall.y);
+            sf::Vector2f relative = bodyCenter - sf::Vector2f(wall.x, wall.y);
             sf::Vector2f local = {
                 relative.x * cosA - relative.y * sinA,
                 relative.x * sinA + relative.y * cosA
@@ -1738,9 +1742,22 @@ void Game::checkWallBounceAudio() {
                 (std::abs(local.x) >= halfW - ballRadius || std::abs(local.y) >= halfH - ballRadius);
 
             if (overlapsWall) {
-                playWallBounceSound();
-                return;
+                return true;
             }
+        }
+
+        return false;
+    };
+
+    if (checkBodyWallBounce(m_cueBallId)) {
+        playWallBounceSound();
+        return;
+    }
+
+    for (const Fruit& fruit : m_fruits) {
+        if (checkBodyWallBounce(fruit.bodyId)) {
+            playWallBounceSound();
+            return;
         }
     }
 }
