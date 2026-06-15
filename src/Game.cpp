@@ -402,6 +402,19 @@ void Game::processEvents() {
             m_window.close();
         }
 
+        if (m_showMainMenu) {
+            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
+                sf::Vector2f mousePos(static_cast<float>(event.mouseButton.x), static_cast<float>(event.mouseButton.y));
+                if (m_playButtonBounds.contains(mousePos)) {
+                    m_showMainMenu = false;
+                    resetTurnTimer();
+                    updateWindowTitle();
+                }
+            }
+
+            continue;
+        }
+
 
         // Evento: Jugador hace Click Izquierdo (Empieza a apuntar/cargar fuerza)
         if (event.type == sf::Event::MouseButtonPressed) {
@@ -452,6 +465,10 @@ void Game::processEvents() {
 
 
 void Game::update() {
+    if (m_showMainMenu) {
+        return;
+    }
+
     // Calculamos el siguiente frame físico
     updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
@@ -713,6 +730,10 @@ std::vector<std::pair<sf::Vector2f, sf::Vector2f>> Game::predictTrajectory(const
 
 
 void Game::render() {
+    if (m_showMainMenu) {
+        drawMainMenu();
+        return;
+    }
 
 
 
@@ -957,6 +978,16 @@ void Game::loadAssets() {
         m_backgroundSprite.setScale({WINDOW_WIDTH / static_cast<float>(m_backgroundTexture.getSize().x), WINDOW_HEIGHT / static_cast<float>(m_backgroundTexture.getSize().y)});
     }
 
+    bool menuLoaded = loadOptionalTexture(m_menuTexture, "assets/images/menu.png");
+    if (!menuLoaded && backgroundLoaded) {
+        m_menuSprite.setTexture(m_backgroundTexture);
+        m_menuSprite.setScale({WINDOW_WIDTH / static_cast<float>(m_backgroundTexture.getSize().x), WINDOW_HEIGHT / static_cast<float>(m_backgroundTexture.getSize().y)});
+    } else if (menuLoaded) {
+        m_menuSprite.setTexture(m_menuTexture);
+        m_menuSprite.setScale({WINDOW_WIDTH / static_cast<float>(m_menuTexture.getSize().x), WINDOW_HEIGHT / static_cast<float>(m_menuTexture.getSize().y)});
+    }
+    m_menuSprite.setPosition({0.0f, 0.0f});
+
 
     // 1.5. Cargar el Marco
     if (!loadTexture(m_frameTexture, "assets/images/marco.png")) {
@@ -1100,16 +1131,49 @@ m_cueSprite.setScale({0.5f, 0.5f});
 }
 
 
+void Game::drawMainMenu() {
+    m_window.clear(sf::Color(20, 80, 150));
+    m_window.draw(m_menuSprite);
+
+    const sf::Vector2f buttonSize(260.0f, 82.0f);
+    const sf::Vector2f buttonPos(
+        WINDOW_CENTER_X - buttonSize.x * 0.5f,
+        WINDOW_CENTER_Y - buttonSize.y * 0.5f + 200.0f
+    );
+    m_playButtonBounds = sf::FloatRect(buttonPos.x, buttonPos.y, buttonSize.x, buttonSize.y);
+
+    sf::RectangleShape playButton(buttonSize);
+    playButton.setPosition(buttonPos);
+    playButton.setFillColor(sf::Color(178, 226, 178, 235));//verde claro
+    playButton.setOutlineThickness(3.0f);
+    playButton.setOutlineColor(sf::Color(0, 210, 0));//amarillo
+    m_window.draw(playButton);
+
+    if (m_hudFontLoaded) {
+        sf::Text playText("PLAY", m_hudFont, 42);
+        playText.setStyle(sf::Text::Bold);
+        playText.setFillColor(sf::Color(255, 255, 255));//blanco 
+        sf::FloatRect textBounds = playText.getLocalBounds();
+        playText.setOrigin({
+            textBounds.left + textBounds.width * 0.5f,
+            textBounds.top + textBounds.height * 0.5f
+        });
+        playText.setPosition({
+            buttonPos.x + buttonSize.x * 0.5f,
+            buttonPos.y + buttonSize.y * 0.5f - 2.0f
+        });
+        m_window.draw(playText);
+    }
+
+    m_window.display();
+}
+
+
 void Game::drawHUD() {
     sf::RectangleShape topPanel({static_cast<float>(WINDOW_WIDTH), 118.0f});
     topPanel.setPosition({0.0f, 0.0f});
     topPanel.setFillColor(sf::Color(20, 28, 34, 215));
     m_window.draw(topPanel);
-
-    sf::RectangleShape bottomPanel({static_cast<float>(WINDOW_WIDTH), 118.0f});
-    bottomPanel.setPosition({0.0f, 802.0f});
-    bottomPanel.setFillColor(sf::Color(18, 23, 28, 225));
-    m_window.draw(bottomPanel);
 
     auto drawText = [&](const std::string& value, unsigned int size, sf::Vector2f pos, sf::Color color) {
         if (!m_hudFontLoaded) {
@@ -1152,7 +1216,7 @@ void Game::drawHUD() {
 
         drawText("Jugador " + std::to_string(playerIndex + 1), 24, {pos.x + 98.0f, pos.y + 14.0f}, sf::Color::White);
         drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 18, {pos.x + 98.0f, pos.y + 48.0f}, sf::Color(220, 230, 230));
-        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, sf::Color(245, 210, 95));
+        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, sf::Color(245, 210, 95)); 
     };
 
     drawPlayerPanel(0, {24.0f, 15.0f});
@@ -1160,17 +1224,16 @@ void Game::drawHUD() {
 
     sf::RectangleShape timerBox({230.0f, 74.0f});
     timerBox.setPosition({625.0f, 22.0f});
-    timerBox.setFillColor(sf::Color(12, 17, 21, 235));
+    timerBox.setFillColor(sf::Color(178, 226, 178, 235));
     timerBox.setOutlineThickness(2.0f);
     timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : sf::Color(245, 210, 95));
     m_window.draw(timerBox);
 
-    drawText("Turno J" + std::to_string(m_currentPlayer + 1), 18, {666.0f, 30.0f}, sf::Color(220, 230, 230));
+    drawText("Turno J" + std::to_string(m_currentPlayer + 1), 18, {666.0f, 30.0f}, sf::Color(28, 52, 38));
     int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
-    drawText(std::to_string(seconds) + "s", 34, {704.0f, 54.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
+    drawText(std::to_string(seconds) + "s", 34, {704.0f, 54.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(185, 40, 34) : sf::Color(18, 38, 28));
 
-    drawText(m_statusMessage, 22, {34.0f, 824.0f}, sf::Color::White);
-    drawText("J1: " + getGroupName(m_playerGroups[0]) + "   J2: " + getGroupName(m_playerGroups[1]), 16, {34.0f, 860.0f}, sf::Color(190, 205, 205));
+    drawText(m_statusMessage, 12, {540.0f, 100.0f}, sf::Color(225, 236, 232));//
 }
 
 

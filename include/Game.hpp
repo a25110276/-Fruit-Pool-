@@ -109,6 +109,8 @@ void spawnTriangle();
 // --- Assets Visuales ---
 sf::Texture m_backgroundTexture;
 sf::Sprite m_backgroundSprite;
+sf::Texture m_menuTexture;
+sf::Sprite m_menuSprite;
 sf::Texture m_frameTexture;
 sf::Sprite m_frameSprite;
 sf::Texture m_tableTexture;
@@ -139,6 +141,7 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 
 // Nuevas funciones
 void loadAssets();
+void drawMainMenu();
 void drawHUD();
 void updateAnimation();
 void updateTurnTimer();
@@ -172,6 +175,8 @@ void updateWindowTitle();
     std::vector<std::pair<sf::Vector2f, sf::Vector2f>> predictTrajectory(const sf::Vector2f& origin, const sf::Vector2f& direction, int maxBounces = 5) const;
 
     // --- Fase 7: Reglas y maquina de estados ---
+    bool m_showMainMenu = true;
+    sf::FloatRect m_playButtonBounds;
     GamePhase m_phase = GamePhase::AIMING;
     int m_currentPlayer = 0;
     bool m_isPlayer1Turn = true;
