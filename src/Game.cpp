@@ -768,7 +768,7 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
 
         bool showFruitPrediction = hasFruitCollision && fruitDistance <= wallDistance;
         if (showFruitPrediction) {
-            aimEnd = fruitCenter;
+            aimEnd = fruitCenter - fruitDirection * 30.0f;
         } else if (hasWallCollision) {
             aimEnd = wallCollisionPoint;
         }
@@ -785,19 +785,19 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
         m_window.draw(aimLine);
 
         if (showFruitPrediction) {
-            const float fruitVisualRadius = 17.0f;
-            const float ringGap = 3.5f;
-            const float ringRadius = fruitVisualRadius + ringGap;
+            const float fruitRadiusPixels = 15.0f;
+            const float ringRadius = 15.0f;
             const float ringThickness = 2.0f;
-            const float shortGuideLength = 32.0f;
+            const float shortGuideLength = 28.0f;
 
-            sf::Vector2f guideStart = fruitCenter + fruitDirection * (ringRadius + 2.0f);
+            sf::Vector2f ghostCenter = fruitCenter - fruitDirection * (fruitRadiusPixels + ringRadius);
+            sf::Vector2f guideStart = fruitCenter + fruitDirection * (fruitRadiusPixels + 2.0f);
             sf::Vector2f guideEnd = guideStart + fruitDirection * shortGuideLength;
             float guideAngle = std::atan2(fruitDirection.y, fruitDirection.x) * 180.0f / 3.14159265f;
 
             sf::CircleShape impactRing(ringRadius);
             impactRing.setOrigin({ringRadius, ringRadius});
-            impactRing.setPosition(fruitCenter);
+            impactRing.setPosition(ghostCenter);
             impactRing.setFillColor(sf::Color::Transparent);
             impactRing.setOutlineThickness(ringThickness);
             impactRing.setOutlineColor(sf::Color(255, 220, 80, 230));
