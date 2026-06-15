@@ -1,11 +1,12 @@
 #include "Game.hpp"
-#include <iostream> 
 #include <cmath>
+#include <cctype>
 #include <limits>
 #include <string>
 #include <sstream>
 #include <algorithm>
 #include <fstream>
+#include <filesystem>
 #include <random>
 
 
@@ -17,9 +18,6 @@ static const float TABLE_OFFSET_Y = 60.0f;
 
 static bool loadTexture(sf::Texture& texture, const std::string& path) {
     if (!texture.loadFromFile(path)) {
-        std::cerr << "No se pudo cargar la imagen: " << path
-                  << "\nEjecuta el juego desde la carpeta raiz del proyecto, donde existe assets/images/."
-                  << std::endl;
         return false;
     }
     return true;
@@ -35,12 +33,10 @@ static bool loadOptionalTexture(sf::Texture& texture, const std::string& path) {
 
 static bool loadSoundBuffer(sf::SoundBuffer& buffer, const std::string& path) {
     if (!std::ifstream(path).good()) {
-        std::cerr << "No se pudo cargar el audio: " << path << std::endl;
         return false;
     }
 
     if (!buffer.loadFromFile(path)) {
-        std::cerr << "No se pudo cargar el audio: " << path << std::endl;
         return false;
     }
 
@@ -122,6 +118,12 @@ createWall(998.0f, 746.0f, 423.0f, wallThickness); // Inferior derecha
 // Verticales (izquierda y derecha, recortadas en los extremos para no afectar el radio de las troneras)
 createWall(196.0f, 460.0f, wallThickness, 425.0f); // Izquierda
 createWall(1285.0f, 458.0f, wallThickness, 427.0f); // Derecha
+
+// Muros exteriores de seguridad: cierran el perímetro para que ninguna fruta salga de la mesa.
+createWall(WINDOW_CENTER_X, 116.0f, 1240.0f, 36.0f); // Exterior superior
+createWall(WINDOW_CENTER_X, 804.0f, 1240.0f, 36.0f); // Exterior inferior
+createWall(120.0f, 460.0f, 36.0f, 720.0f);          // Exterior izquierdo
+createWall(1360.0f, 460.0f, 36.0f, 720.0f);         // Exterior derecho
 
 
 // Esquinas ahora con dos cubos iguales en 45 grados, tangencialmente unidos al radio de las troneras
@@ -480,6 +482,7 @@ void Game::processEvents() {
         if (event.type == sf::Event::MouseButtonPressed) {
             if (event.mouseButton.button == sf::Mouse::Left && m_phase == GamePhase::AIMING && areBallsStopped()) {
                 m_isAiming = true;
+                playCueStretchSound();
                 // Guardamos el punto exacto donde hizo click
                 m_mouseStartPos = sf::Vector2f(event.mouseButton.x, event.mouseButton.y);
             }
@@ -508,6 +511,7 @@ void Game::processEvents() {
                 m_cueBallPocketedThisShot = false;
                 m_eightBallPocketedThisShot = false;
                 m_shotPocketedGroups.clear();
+                m_shotPocketedFruits.clear();
                 playCueHitSound();
                 updateWindowTitle();
 
@@ -533,6 +537,7 @@ void Game::update() {
     updateAnimation();
     b2World_Step(m_worldId, 1.0f / 60.0f, 4);
     checkCollisionAudio();
+    checkWallBounceAudio();
     checkPockets();
     resolveShotIfReady();
     updateTurnTimer();
@@ -808,7 +813,6 @@ void Game::render() {
 
 
     // Imprimimos coordenadas en la terminal
-   // std::cout << "Posicion del Coco: X=" << pixelX << ", Y=" << pixelY << std::endl;
     
     // Dibujar el fondo primero, luego el mantel atrás del marco y después las frutas
     m_window.draw(m_backgroundSprite);
@@ -1185,32 +1189,32 @@ m_cueSprite.setScale({0.5f, 0.5f});
     m_hudFontLoaded =
         m_hudFont.loadFromFile("assets/fonts/hud.ttf") ||
         m_hudFont.loadFromFile("C:/Windows/Fonts/arial.ttf");
-    if (!m_hudFontLoaded) {
-        std::cerr << "No se pudo cargar fuente para HUD. Agrega assets/fonts/hud.ttf." << std::endl;
-    }
 
-    for (std::size_t i = 0; i < m_avatarTextures.size(); ++i) {
-        std::string path = "assets/avatars/avatar_" + std::to_string(i + 1) + ".png";
-        m_avatarLoaded[i] = loadOptionalTexture(m_avatarTextures[i], path);
+    m_avatarTextures.clear();
+    std::vector<std::filesystem::path> avatarPaths;
+    std::filesystem::path avatarDirectory("assets/avatars");
+    if (std::filesystem::exists(avatarDirectory)) {
+        for (const auto& entry : std::filesystem::directory_iterator(avatarDirectory)) {
+            std::string extension = entry.path().extension().string();
+            std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            if (entry.is_regular_file() && extension == ".png") {
+                avatarPaths.push_back(entry.path());
+            }
+        }
     }
+    std::sort(avatarPaths.begin(), avatarPaths.end());
 
-    std::vector<int> availableAvatarIDs;
-    for (std::size_t i = 0; i < m_avatarLoaded.size(); ++i) {
-        if (m_avatarLoaded[i]) {
-            availableAvatarIDs.push_back(static_cast<int>(i) + 1);
+    m_avatarTextures.reserve(avatarPaths.size());
+    for (const auto& path : avatarPaths) {
+        m_avatarTextures.emplace_back();
+        if (!m_avatarTextures.back().loadFromFile(path.string())) {
+            m_avatarTextures.pop_back();
         }
     }
 
-    if (!availableAvatarIDs.empty()) {
-        static std::random_device randomDevice;
-        static std::mt19937 generator(randomDevice());
-        std::shuffle(availableAvatarIDs.begin(), availableAvatarIDs.end(), generator);
-
-        m_playerAvatarID[0] = availableAvatarIDs[0];
-        m_playerAvatarID[1] = availableAvatarIDs.size() > 1
-            ? availableAvatarIDs[1]
-            : availableAvatarIDs[0];
-    }
+    randomizeAvatars();
 
     m_cueHitLoaded = loadSoundBuffer(m_cueHitBuffer, "assets/music/golpe_taco.ogg");
     if (m_cueHitLoaded) {
@@ -1222,6 +1226,24 @@ m_cueSprite.setScale({0.5f, 0.5f});
     if (m_fruitCollisionLoaded) {
         m_fruitCollisionSound.setBuffer(m_fruitCollisionBuffer);
         m_fruitCollisionSound.setVolume(55.0f);
+    }
+
+    m_wallBounceLoaded =
+        loadSoundBuffer(m_wallBounceBuffer, "assets/music/rebote_muro.ogg") ||
+        loadSoundBuffer(m_wallBounceBuffer, "assets/music/choque_muro.ogg") ||
+        loadSoundBuffer(m_wallBounceBuffer, "assets/music/rebote_pared.ogg");
+    if (m_wallBounceLoaded) {
+        m_wallBounceSound.setBuffer(m_wallBounceBuffer);
+        m_wallBounceSound.setVolume(50.0f);
+    }
+
+    m_cueStretchLoaded =
+        loadSoundBuffer(m_cueStretchBuffer, "assets/music/estirar_cana.ogg") ||
+        loadSoundBuffer(m_cueStretchBuffer, "assets/music/estirar_taco.ogg") ||
+        loadSoundBuffer(m_cueStretchBuffer, "assets/music/cargar_tiro.ogg");
+    if (m_cueStretchLoaded) {
+        m_cueStretchSound.setBuffer(m_cueStretchBuffer);
+        m_cueStretchSound.setVolume(55.0f);
     }
 
     m_backgroundMusicLoaded =
@@ -1420,9 +1442,9 @@ void Game::drawHUD() {
         panel.setOutlineColor(active ? hudGreen : sf::Color(95, 105, 110));
         m_window.draw(panel);
 
-        int avatarIndex = std::max(1, std::min(6, m_playerAvatarID[playerIndex])) - 1;
         sf::FloatRect avatarRect(pos.x + 16.0f, pos.y + 12.0f, 64.0f, 64.0f);
-        if (m_avatarLoaded[avatarIndex]) {
+        if (!m_avatarTextures.empty()) {
+            std::size_t avatarIndex = std::min(m_playerAvatarIndex[playerIndex], m_avatarTextures.size() - 1);
             sf::Sprite avatar;
             avatar.setTexture(m_avatarTextures[avatarIndex]);
             sf::Vector2u size = m_avatarTextures[avatarIndex].getSize();
@@ -1438,9 +1460,43 @@ void Game::drawHUD() {
             m_window.draw(placeholder);
         }
 
-        drawText("Jugador " + std::to_string(playerIndex + 1), 24, {pos.x + 98.0f, pos.y + 14.0f}, sf::Color::White);
-        drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 18, {pos.x + 98.0f, pos.y + 48.0f}, sf::Color(220, 230, 230));
-        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, hudGreen); 
+        const float fruitCircleDiameter = 35.0f;
+        const float fruitCircleRadius = fruitCircleDiameter * 0.5f;
+        const float fruitCircleStartX = pos.x + 98.0f;
+        const float fruitCircleY = pos.y + 11.0f;
+        const float fruitCircleAreaWidth = 306.0f;
+        const float fruitCircleGap = (fruitCircleAreaWidth - (fruitCircleDiameter * 7.0f)) / 6.0f;
+
+        for (int i = 0; i < 7; ++i) {
+            sf::CircleShape fruitSlot(fruitCircleRadius);
+            sf::Vector2f slotPos = {fruitCircleStartX + i * (fruitCircleDiameter + fruitCircleGap), fruitCircleY};
+            fruitSlot.setPosition(slotPos);
+            fruitSlot.setFillColor(sf::Color(20, 28, 34, 180));
+            fruitSlot.setOutlineThickness(2.0f);
+            fruitSlot.setOutlineColor(hudGreen);
+            m_window.draw(fruitSlot);
+
+            if (i < static_cast<int>(m_playerPocketedFruits[playerIndex].size())) {
+                FruitType pocketedFruit = m_playerPocketedFruits[playerIndex][i];
+                auto textureIt = m_fruitTextures.find(pocketedFruit);
+                auto infoIt = m_fruitSpriteInfo.find(pocketedFruit);
+                if (textureIt != m_fruitTextures.end() && infoIt != m_fruitSpriteInfo.end()) {
+                    const FruitSpriteInfo& info = infoIt->second;
+                    sf::Sprite fruitIcon;
+                    fruitIcon.setTexture(textureIt->second);
+                    fruitIcon.setTextureRect(sf::IntRect({0, 0}, {info.frameWidth, info.frameHeight}));
+                    fruitIcon.setOrigin({info.frameWidth / 2.0f, info.frameHeight / 2.0f});
+                    fruitIcon.setPosition({slotPos.x + fruitCircleRadius, slotPos.y + fruitCircleRadius});
+                    float iconSize = 31.0f;
+                    fruitIcon.setScale({iconSize / info.frameWidth, iconSize / info.frameHeight});
+                    m_window.draw(fruitIcon);
+                }
+            }
+        }
+
+        drawText("Jugador " + std::to_string(playerIndex + 1), 16, {pos.x + 98.0f, pos.y + 58.0f}, sf::Color::White);
+        drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 14, {pos.x + 205.0f, pos.y + 60.0f}, sf::Color(220, 230, 230));
+        drawText(getGroupName(m_playerGroups[playerIndex]), 14, {pos.x + 326.0f, pos.y + 60.0f}, hudGreen); 
     };
 
     drawPlayerPanel(0, {24.0f, 15.0f});
@@ -1480,13 +1536,34 @@ void Game::drawHUD() {
     m_window.draw(backButton);
     drawCenteredText("Menu", 20, {m_backToMenuButtonBounds.left + m_backToMenuButtonBounds.width * 0.5f, m_backToMenuButtonBounds.top + m_backToMenuButtonBounds.height * 0.5f}, hudGreen);
 
-    drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 108.0f}, sf::Color(225, 236, 232));//
+    drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 108.0f}, sf::Color(225, 236, 232));
 }
 
 
 void Game::resetTurnTimer() {
     m_turnTimeRemaining = 30.0f;
     m_turnClock.restart();
+}
+
+
+void Game::randomizeAvatars() {
+    if (m_avatarTextures.empty()) {
+        return;
+    }
+
+    std::vector<std::size_t> availableAvatarIndices;
+    for (std::size_t i = 0; i < m_avatarTextures.size(); ++i) {
+        availableAvatarIndices.push_back(i);
+    }
+
+    static std::random_device randomDevice;
+    static std::mt19937 generator(randomDevice());
+    std::shuffle(availableAvatarIndices.begin(), availableAvatarIndices.end(), generator);
+
+    m_playerAvatarIndex[0] = availableAvatarIndices[0];
+    m_playerAvatarIndex[1] = availableAvatarIndices.size() > 1
+        ? availableAvatarIndices[1]
+        : availableAvatarIndices[0];
 }
 
 
@@ -1500,6 +1577,10 @@ void Game::restartMatch() {
     m_cueBallPocketedThisShot = false;
     m_eightBallPocketedThisShot = false;
     m_shotPocketedGroups.clear();
+    m_shotPocketedFruits.clear();
+    m_playerPocketedFruits[0].clear();
+    m_playerPocketedFruits[1].clear();
+    randomizeAvatars();
 
     for (Fruit& fruit : m_fruits) {
         b2DestroyBody(fruit.bodyId);
@@ -1554,6 +1635,13 @@ void Game::playCueHitSound() {
 }
 
 
+void Game::playCueStretchSound() {
+    if (m_cueStretchLoaded) {
+        m_cueStretchSound.play();
+    }
+}
+
+
 void Game::playFruitCollisionSound() {
     if (!m_fruitCollisionLoaded || m_collisionSoundClock.getElapsedTime().asSeconds() < 0.12f) {
         return;
@@ -1561,6 +1649,16 @@ void Game::playFruitCollisionSound() {
 
     m_fruitCollisionSound.play();
     m_collisionSoundClock.restart();
+}
+
+
+void Game::playWallBounceSound() {
+    if (!m_wallBounceLoaded || m_wallBounceSoundClock.getElapsedTime().asSeconds() < 0.12f) {
+        return;
+    }
+
+    m_wallBounceSound.play();
+    m_wallBounceSoundClock.restart();
 }
 
 
@@ -1598,6 +1696,49 @@ void Game::checkCollisionAudio() {
             float relSpeed = std::sqrt(relX * relX + relY * relY);
             if ((dx * dx + dy * dy) <= collisionDistanceSq && relSpeed >= velocityThreshold) {
                 playFruitCollisionSound();
+                return;
+            }
+        }
+    }
+}
+
+
+void Game::checkWallBounceAudio() {
+    if (!m_wallBounceLoaded || m_phase == GamePhase::AIMING) {
+        return;
+    }
+
+    const float ballRadius = 16.0f;
+    const float speedThreshold = 4.0f;
+    for (const Fruit& fruit : m_fruits) {
+        b2Vec2 velocity = b2Body_GetLinearVelocity(fruit.bodyId);
+        float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+        if (speed < speedThreshold) {
+            continue;
+        }
+
+        b2Vec2 position = b2Body_GetPosition(fruit.bodyId);
+        sf::Vector2f fruitCenter(position.x * SCALE, position.y * SCALE);
+
+        for (const WallRender& wall : m_wallRenders) {
+            float angle = -wall.angle * 3.14159265f / 180.0f;
+            float cosA = std::cos(angle);
+            float sinA = std::sin(angle);
+            sf::Vector2f relative = fruitCenter - sf::Vector2f(wall.x, wall.y);
+            sf::Vector2f local = {
+                relative.x * cosA - relative.y * sinA,
+                relative.x * sinA + relative.y * cosA
+            };
+
+            float halfW = wall.w * 0.5f;
+            float halfH = wall.h * 0.5f;
+            bool overlapsWall =
+                local.x >= -halfW - ballRadius && local.x <= halfW + ballRadius &&
+                local.y >= -halfH - ballRadius && local.y <= halfH + ballRadius &&
+                (std::abs(local.x) >= halfW - ballRadius || std::abs(local.y) >= halfH - ballRadius);
+
+            if (overlapsWall) {
+                playWallBounceSound();
                 return;
             }
         }
@@ -1790,9 +1931,9 @@ Game::FruitGroup Game::getFruitGroup(FruitType type) const {
 std::string Game::getGroupName(FruitGroup group) const {
     switch (group) {
         case FruitGroup::SOLID:
-            return "citricos";
-        case FruitGroup::STRIPED:
             return "bayas";
+        case FruitGroup::STRIPED:
+            return "citricos";
         case FruitGroup::NONE:
         default:
             return "sin grupo";
@@ -1872,10 +2013,6 @@ void Game::resolveShotIfReady() {
         bool legalEight = hasClearedGroup(shooter) && !m_cueBallPocketedThisShot;
         m_winner = legalEight ? shooter : opponent;
         m_playerWins[m_winner]++;
-        std::string winnerMessage = legalEight
-            ? "Jugador " + std::to_string(shooter + 1) + " gana embocando la sandia."
-            : "Jugador " + std::to_string(opponent + 1) + " gana: la sandia cayo antes de tiempo o con falta.";
-        std::cout << winnerMessage << std::endl;
         int roundWinner = m_winner;
         restartMatch();
         m_statusMessage = "Jugador " + std::to_string(roundWinner + 1) + ": gano la ronda";
@@ -1885,8 +2022,6 @@ void Game::resolveShotIfReady() {
 
     if (!m_cueBallPocketedThisShot && !m_shotPocketedGroups.empty() && m_playerGroups[0] == FruitGroup::NONE) {
         assignGroups(m_shotPocketedGroups.front());
-        std::cout << "Grupos asignados: Jugador 1 = " << getGroupName(m_playerGroups[0])
-                  << ", Jugador 2 = " << getGroupName(m_playerGroups[1]) << std::endl;
     }
 
     bool pocketedOwnGroup = false;
@@ -1896,6 +2031,16 @@ void Game::resolveShotIfReady() {
             (shooterGroup == FruitGroup::NONE && group != FruitGroup::NONE)) {
             pocketedOwnGroup = true;
             break;
+        }
+    }
+
+    for (FruitType pocketedFruit : m_shotPocketedFruits) {
+        FruitGroup fruitGroup = getFruitGroup(pocketedFruit);
+        for (int playerIndex = 0; playerIndex < 2; ++playerIndex) {
+            if (fruitGroup == m_playerGroups[playerIndex] && m_playerPocketedFruits[playerIndex].size() < 7) {
+                m_playerPocketedFruits[playerIndex].push_back(pocketedFruit);
+                break;
+            }
         }
     }
 
@@ -1913,6 +2058,7 @@ void Game::resolveShotIfReady() {
     m_cueBallPocketedThisShot = false;
     m_eightBallPocketedThisShot = false;
     m_shotPocketedGroups.clear();
+    m_shotPocketedFruits.clear();
     m_phase = GamePhase::AIMING;
     updateWindowTitle();
 }
@@ -1933,7 +2079,6 @@ void Game::updateWindowTitle() {
         }
     }
 
-    title << " | " << m_statusMessage;
     m_window.setTitle(title.str());
 }
 
@@ -1966,6 +2111,7 @@ void Game::checkPockets() {
                 m_eightBallPocketedThisShot = true;
             } else {
                 m_shotPocketedGroups.push_back(pocketedGroup);
+                m_shotPocketedFruits.push_back(it->type);
             }
 
             // Destruir el cuerpo físico en Box2D
