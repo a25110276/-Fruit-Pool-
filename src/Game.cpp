@@ -444,7 +444,12 @@ void Game::processEvents() {
                 } else if (m_playButtonBounds.contains(mousePos)) {
                     m_showMainMenu = false;
                     m_menuPanelOpen = false;
-                    resetTurnTimer();
+                    if (!m_hasStartedMatch) {
+                        resetTurnTimer();
+                        m_hasStartedMatch = true;
+                    } else {
+                        m_turnClock.restart();
+                    }
                     updateWindowTitle();
                 }
             }
@@ -464,6 +469,7 @@ void Game::processEvents() {
                 m_showMainMenu = true;
                 m_menuPanelOpen = false;
                 m_menuPanelView = 0;
+                m_turnClock.restart();
                 updateWindowTitle();
                 continue;
             }
@@ -1454,7 +1460,7 @@ void Game::drawHUD() {
 
     drawCenteredText("Turno Jugador " + std::to_string(m_currentPlayer + 1), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, hudGreen);
     int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
-    drawCenteredText(std::to_string(seconds) + "s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
+    drawCenteredText(std::to_string(seconds) + " s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
 
     m_restartButtonBounds = sf::FloatRect(timerPos.x - hudGap - actionButtonSize.x, 32.0f, actionButtonSize.x, actionButtonSize.y);
     sf::RectangleShape restartButton({m_restartButtonBounds.width, m_restartButtonBounds.height});
@@ -1474,7 +1480,7 @@ void Game::drawHUD() {
     m_window.draw(backButton);
     drawCenteredText("Menu", 20, {m_backToMenuButtonBounds.left + m_backToMenuButtonBounds.width * 0.5f, m_backToMenuButtonBounds.top + m_backToMenuButtonBounds.height * 0.5f}, hudGreen);
 
-    drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 105.0f}, sf::Color(225, 236, 232));//
+    drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 108.0f}, sf::Color(225, 236, 232));//
 }
 
 
@@ -1503,7 +1509,7 @@ void Game::restartMatch() {
     resetCueBall();
     spawnTriangle();
     resetTurnTimer();
-    m_statusMessage = "Mesa abierta";
+    m_statusMessage = "Jugador 1: Mesa abierta";
     updateWindowTitle();
 }
 
@@ -1519,9 +1525,10 @@ void Game::updateTurnTimer() {
         return;
     }
 
+    int timedOutPlayer = m_currentPlayer;
     m_isAiming = false;
     switchTurn();
-    m_statusMessage = "Tiempo agotado";
+    m_statusMessage = "Jugador " + std::to_string(timedOutPlayer + 1) + ": tiempo agotado";
     updateWindowTitle();
 }
 
@@ -1653,19 +1660,13 @@ b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
 
 
 void Game::spawnTriangle() {
-    // Orden de frutas en el triángulo (5 filas: 1, 2, 3, 4, 5 = 15 total)
-    std::vector<FruitType> fruitOrder = {
-        // Fila 1 (1 fruta): Sandía (bola 8)
-        SANDIA,
-        // Fila 2 (2 frutas)
-        LIMA, LIMON,
-        // Fila 3 (3 frutas)
-        TORONJA, MANDARINA, NARANJA,
-        // Fila 4 (4 frutas)
-        GRANADA, KIWI, FRESA, CEREZA,
-        // Fila 5 (5 frutas)
-        BLACKBERRY, FRAMBUESA, UVA_VERDE, UVA_MORADA, MORA_AZUL
+    std::vector<FruitType> shuffledFruits = {
+        LIMA, LIMON, TORONJA, MANDARINA, NARANJA, GRANADA, KIWI,
+        FRESA, CEREZA, BLACKBERRY, FRAMBUESA, UVA_VERDE, UVA_MORADA, MORA_AZUL
     };
+    static std::random_device randomDevice;
+    static std::mt19937 generator(randomDevice());
+    std::shuffle(shuffledFruits.begin(), shuffledFruits.end(), generator);
 
 
     // Inicio del triángulo
@@ -1720,7 +1721,7 @@ void Game::spawnTriangle() {
             // Crear la fruta con tipo específico
             Fruit fruit;
             fruit.bodyId = fruitId;
-            fruit.type = fruitOrder[fruitIndex++];
+            fruit.type = (row == 2 && col == 1) ? SANDIA : shuffledFruits[fruitIndex++];
             
             // Asignar la textura correspondiente
             if (m_fruitTextures.find(fruit.type) != m_fruitTextures.end()) {
@@ -1875,8 +1876,9 @@ void Game::resolveShotIfReady() {
             ? "Jugador " + std::to_string(shooter + 1) + " gana embocando la sandia."
             : "Jugador " + std::to_string(opponent + 1) + " gana: la sandia cayo antes de tiempo o con falta.";
         std::cout << winnerMessage << std::endl;
+        int roundWinner = m_winner;
         restartMatch();
-        m_statusMessage = "Ronda nueva";
+        m_statusMessage = "Jugador " + std::to_string(roundWinner + 1) + ": gano la ronda";
         updateWindowTitle();
         return;
     }
@@ -1899,13 +1901,13 @@ void Game::resolveShotIfReady() {
 
     if (m_cueBallPocketedThisShot) {
         switchTurn();
-        m_statusMessage = "Falta: cayo el coco";
+        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": falta, cayo el coco";
     } else if (!pocketedOwnGroup) {
         switchTurn();
-        m_statusMessage = "No emboco fruta propia";
+        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": no emboco fruta propia";
     } else {
         resetTurnTimer();
-        m_statusMessage = "Sigue tirando";
+        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": sigue tirando";
     }
 
     m_cueBallPocketedThisShot = false;

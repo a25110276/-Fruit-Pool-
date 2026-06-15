@@ -179,6 +179,7 @@ void updateWindowTitle();
 
     // --- Fase 7: Reglas y maquina de estados ---
     bool m_showMainMenu = true;
+    bool m_hasStartedMatch = false;
     bool m_menuPanelOpen = false;
     bool m_draggingVolumeSlider = false;
     int m_menuPanelView = 0;
@@ -198,7 +199,7 @@ void updateWindowTitle();
     bool m_cueBallPocketedThisShot = false;
     bool m_eightBallPocketedThisShot = false;
     std::vector<FruitGroup> m_shotPocketedGroups;
-    std::string m_statusMessage = "Mesa abierta";
+    std::string m_statusMessage = "Jugador 1: Mesa abierta";
 
     // --- Fase 8: HUD ---
     sf::Font m_hudFont;
