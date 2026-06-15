@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <fstream>
+#include <random>
 
 
 static const unsigned int WINDOW_WIDTH = 1480;
@@ -1062,6 +1063,24 @@ m_cueSprite.setScale({0.5f, 0.5f});
     for (std::size_t i = 0; i < m_avatarTextures.size(); ++i) {
         std::string path = "assets/avatars/avatar_" + std::to_string(i + 1) + ".png";
         m_avatarLoaded[i] = loadOptionalTexture(m_avatarTextures[i], path);
+    }
+
+    std::vector<int> availableAvatarIDs;
+    for (std::size_t i = 0; i < m_avatarLoaded.size(); ++i) {
+        if (m_avatarLoaded[i]) {
+            availableAvatarIDs.push_back(static_cast<int>(i) + 1);
+        }
+    }
+
+    if (!availableAvatarIDs.empty()) {
+        static std::random_device randomDevice;
+        static std::mt19937 generator(randomDevice());
+        std::shuffle(availableAvatarIDs.begin(), availableAvatarIDs.end(), generator);
+
+        m_playerAvatarID[0] = availableAvatarIDs[0];
+        m_playerAvatarID[1] = availableAvatarIDs.size() > 1
+            ? availableAvatarIDs[1]
+            : availableAvatarIDs[0];
     }
 
     m_cueHitLoaded = loadSoundBuffer(m_cueHitBuffer, "assets/music/golpe_taco.ogg");
