@@ -806,7 +806,8 @@ void Game::render() {
     
     // Dibujar el fondo primero, luego el mantel atrás del marco y después las frutas
     m_window.draw(m_backgroundSprite);
-    m_window.draw(m_tableSprite);   // Mantel centrado detrás del marco
+    m_window.draw(m_tableSprite);   // Mantel centrado detras del marco
+    m_window.draw(m_frameSprite);
 
 
     m_window.draw(m_cocoSprite);    // Luego las frutas
@@ -821,6 +822,8 @@ void Game::render() {
     }
    
 // NUEVO: Apuntado avanzado con retroceso y láser grueso
+float powerPercentage = 0.0f;
+
 if (m_isAiming && m_phase == GamePhase::AIMING) {
     // 1. Obtener la posición física central del Coco
     b2Vec2 pos = b2Body_GetPosition(m_cueBallId);
@@ -939,9 +942,10 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
         m_window.draw(m_cueSprite);
 
 
-        float powerPercentage = std::min(pullDist / maxPull, 1.0f); // Valor entre 0 y 1
+        powerPercentage = std::min(pullDist / maxPull, 1.0f); // Valor entre 0 y 1
 
 
+        if (false) {
         // Dimensiones de la barra
         float barWidth = 30.0f;
         float barHeight = 200.0f;
@@ -987,8 +991,40 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
         barBorder.setOutlineThickness(2.0f);
         barBorder.setOutlineColor(sf::Color::White);
         m_window.draw(barBorder);
+        }
     }
-    m_window.draw(m_frameSprite);
+
+    const float powerBarWidth = 46.0f;
+    const float powerBarHeight = 360.0f;
+    const float powerBarX = 38.0f;
+    const float powerBarY = (WINDOW_HEIGHT - powerBarHeight) * 0.5f;
+
+    sf::RectangleShape powerBarBackground({powerBarWidth, powerBarHeight});
+    powerBarBackground.setPosition({powerBarX, powerBarY});
+    powerBarBackground.setFillColor(sf::Color(36, 44, 50, 225));
+    m_window.draw(powerBarBackground);
+
+    float powerFillHeight = powerBarHeight * powerPercentage;
+    sf::RectangleShape powerBarFill({powerBarWidth, powerFillHeight});
+    powerBarFill.setPosition({powerBarX, powerBarY + powerBarHeight - powerFillHeight});
+
+    sf::Color powerColor(82, 210, 115);
+    if (powerPercentage >= 0.66f) {
+        powerColor = sf::Color(235, 85, 70);
+    } else if (powerPercentage >= 0.33f) {
+        powerColor = sf::Color(245, 210, 95);
+    }
+
+    powerBarFill.setFillColor(powerColor);
+    m_window.draw(powerBarFill);
+
+    sf::RectangleShape powerBarBorder({powerBarWidth, powerBarHeight});
+    powerBarBorder.setPosition({powerBarX, powerBarY});
+    powerBarBorder.setFillColor(sf::Color::Transparent);
+    powerBarBorder.setOutlineThickness(3.0f);
+    powerBarBorder.setOutlineColor(sf::Color(178, 226, 178));
+    m_window.draw(powerBarBorder);
+
     drawHUD();
     m_window.display();
 }
@@ -1334,6 +1370,10 @@ void Game::drawCenteredMenuPanel() {
 
 
 void Game::drawHUD() {
+    const sf::Color panelActiveColor(48, 90, 78, 235);
+    const sf::Color panelIdleColor(36, 44, 50, 225);
+    const sf::Color hudGreen(178, 226, 178);
+
     sf::RectangleShape topPanel({static_cast<float>(WINDOW_WIDTH), 118.0f});
     topPanel.setPosition({0.0f, 0.0f});
     topPanel.setFillColor(sf::Color(20, 28, 34, 215));
@@ -1369,9 +1409,9 @@ void Game::drawHUD() {
         bool active = playerIndex == m_currentPlayer && m_phase != GamePhase::GAME_OVER;
         sf::RectangleShape panel({420.0f, 88.0f});
         panel.setPosition(pos);
-        panel.setFillColor(active ? sf::Color(48, 90, 78, 235) : sf::Color(36, 44, 50, 225));
+        panel.setFillColor(active ? panelActiveColor : panelIdleColor);
         panel.setOutlineThickness(2.0f);
-        panel.setOutlineColor(active ? sf::Color(245, 210, 95) : sf::Color(95, 105, 110));
+        panel.setOutlineColor(active ? hudGreen : sf::Color(95, 105, 110));
         m_window.draw(panel);
 
         int avatarIndex = std::max(1, std::min(6, m_playerAvatarID[playerIndex])) - 1;
@@ -1394,7 +1434,7 @@ void Game::drawHUD() {
 
         drawText("Jugador " + std::to_string(playerIndex + 1), 24, {pos.x + 98.0f, pos.y + 14.0f}, sf::Color::White);
         drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 18, {pos.x + 98.0f, pos.y + 48.0f}, sf::Color(220, 230, 230));
-        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, sf::Color(245, 210, 95)); 
+        drawText(getGroupName(m_playerGroups[playerIndex]), 16, {pos.x + 286.0f, pos.y + 50.0f}, hudGreen); 
     };
 
     drawPlayerPanel(0, {24.0f, 15.0f});
@@ -1407,32 +1447,32 @@ void Game::drawHUD() {
 
     sf::RectangleShape timerBox(timerSize);
     timerBox.setPosition(timerPos);
-    timerBox.setFillColor(sf::Color(178, 226, 178, 235));
+    timerBox.setFillColor(panelIdleColor);
     timerBox.setOutlineThickness(2.0f);
-    timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : sf::Color(245, 210, 95));
+    timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : hudGreen);
     m_window.draw(timerBox);
 
-    drawCenteredText("Turno Jugador " + std::to_string(m_currentPlayer + 1), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, sf::Color(28, 52, 38));
+    drawCenteredText("Turno Jugador " + std::to_string(m_currentPlayer + 1), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, hudGreen);
     int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
-    drawCenteredText(std::to_string(seconds) + "s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(185, 40, 34) : sf::Color(18, 38, 28));
+    drawCenteredText(std::to_string(seconds) + "s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
 
     m_restartButtonBounds = sf::FloatRect(timerPos.x - hudGap - actionButtonSize.x, 32.0f, actionButtonSize.x, actionButtonSize.y);
     sf::RectangleShape restartButton({m_restartButtonBounds.width, m_restartButtonBounds.height});
     restartButton.setPosition({m_restartButtonBounds.left, m_restartButtonBounds.top});
-    restartButton.setFillColor(sf::Color(178, 226, 178, 235));
+    restartButton.setFillColor(panelIdleColor);
     restartButton.setOutlineThickness(2.0f);
-    restartButton.setOutlineColor(sf::Color(245, 210, 95));
+    restartButton.setOutlineColor(hudGreen);
     m_window.draw(restartButton);
-    drawCenteredText("Reiniciar", 18, {m_restartButtonBounds.left + m_restartButtonBounds.width * 0.5f, m_restartButtonBounds.top + m_restartButtonBounds.height * 0.5f}, sf::Color(18, 38, 28));
+    drawCenteredText("Reiniciar", 18, {m_restartButtonBounds.left + m_restartButtonBounds.width * 0.5f, m_restartButtonBounds.top + m_restartButtonBounds.height * 0.5f}, hudGreen);
 
     m_backToMenuButtonBounds = sf::FloatRect(timerPos.x + timerSize.x + hudGap, 32.0f, actionButtonSize.x, actionButtonSize.y);
     sf::RectangleShape backButton({m_backToMenuButtonBounds.width, m_backToMenuButtonBounds.height});
     backButton.setPosition({m_backToMenuButtonBounds.left, m_backToMenuButtonBounds.top});
-    backButton.setFillColor(sf::Color(178, 226, 178, 235));
+    backButton.setFillColor(panelIdleColor);
     backButton.setOutlineThickness(2.0f);
-    backButton.setOutlineColor(sf::Color(245, 210, 95));
+    backButton.setOutlineColor(hudGreen);
     m_window.draw(backButton);
-    drawCenteredText("Menu", 20, {m_backToMenuButtonBounds.left + m_backToMenuButtonBounds.width * 0.5f, m_backToMenuButtonBounds.top + m_backToMenuButtonBounds.height * 0.5f}, sf::Color(18, 38, 28));
+    drawCenteredText("Menu", 20, {m_backToMenuButtonBounds.left + m_backToMenuButtonBounds.width * 0.5f, m_backToMenuButtonBounds.top + m_backToMenuButtonBounds.height * 0.5f}, hudGreen);
 
     drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 105.0f}, sf::Color(225, 236, 232));//
 }
@@ -1831,12 +1871,12 @@ void Game::resolveShotIfReady() {
         bool legalEight = hasClearedGroup(shooter) && !m_cueBallPocketedThisShot;
         m_winner = legalEight ? shooter : opponent;
         m_playerWins[m_winner]++;
-        m_phase = GamePhase::GAME_OVER;
-        m_isAiming = false;
-        m_statusMessage = legalEight
+        std::string winnerMessage = legalEight
             ? "Jugador " + std::to_string(shooter + 1) + " gana embocando la sandia."
             : "Jugador " + std::to_string(opponent + 1) + " gana: la sandia cayo antes de tiempo o con falta.";
-        std::cout << m_statusMessage << std::endl;
+        std::cout << winnerMessage << std::endl;
+        restartMatch();
+        m_statusMessage = "Ronda nueva";
         updateWindowTitle();
         return;
     }
@@ -1952,6 +1992,7 @@ void Game::checkPockets() {
     }
    
 }
+
 
 
 
