@@ -143,8 +143,10 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 void loadAssets();
 void drawMainMenu();
 void drawHUD();
+void drawCenteredMenuPanel();
 void updateAnimation();
 void updateTurnTimer();
+void setMusicVolumeFromMouse(float mouseX);
 void playCueHitSound();
 void playFruitCollisionSound();
 void checkCollisionAudio();
@@ -153,6 +155,7 @@ bool areBallsStopped() const;
 bool hasClearedGroup(int playerIndex) const;
 void switchTurn();
 void resetTurnTimer();
+void restartMatch();
 void assignGroups(FruitGroup pocketedGroup);
 void resetCueBall();
 FruitGroup getFruitGroup(FruitType type) const;
@@ -176,7 +179,17 @@ void updateWindowTitle();
 
     // --- Fase 7: Reglas y maquina de estados ---
     bool m_showMainMenu = true;
+    bool m_menuPanelOpen = false;
+    bool m_draggingVolumeSlider = false;
+    int m_menuPanelView = 0;
     sf::FloatRect m_playButtonBounds;
+    sf::FloatRect m_menuButtonBounds;
+    sf::FloatRect m_closeMenuPanelBounds;
+    sf::FloatRect m_musicSliderBounds;
+    sf::FloatRect m_rulesButtonBounds;
+    sf::FloatRect m_creditsButtonBounds;
+    sf::FloatRect m_restartButtonBounds;
+    sf::FloatRect m_backToMenuButtonBounds;
     GamePhase m_phase = GamePhase::AIMING;
     int m_currentPlayer = 0;
     bool m_isPlayer1Turn = true;
@@ -185,7 +198,7 @@ void updateWindowTitle();
     bool m_cueBallPocketedThisShot = false;
     bool m_eightBallPocketedThisShot = false;
     std::vector<FruitGroup> m_shotPocketedGroups;
-    std::string m_statusMessage = "Mesa abierta - Turno del Jugador 1";
+    std::string m_statusMessage = "Mesa abierta";
 
     // --- Fase 8: HUD ---
     sf::Font m_hudFont;
@@ -202,7 +215,10 @@ void updateWindowTitle();
     sf::SoundBuffer m_fruitCollisionBuffer;
     sf::Sound m_cueHitSound;
     sf::Sound m_fruitCollisionSound;
+    sf::Music m_backgroundMusic;
     bool m_cueHitLoaded = false;
     bool m_fruitCollisionLoaded = false;
+    bool m_backgroundMusicLoaded = false;
+    float m_musicVolume = 45.0f;
     sf::Clock m_collisionSoundClock;
 };

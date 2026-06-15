@@ -47,6 +47,14 @@ static bool loadSoundBuffer(sf::SoundBuffer& buffer, const std::string& path) {
     return true;
 }
 
+static bool openOptionalMusic(sf::Music& music, const std::string& path) {
+    if (!std::ifstream(path).good()) {
+        return false;
+    }
+
+    return music.openFromFile(path);
+}
+
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
 Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool - Fase 8") {
@@ -404,16 +412,61 @@ void Game::processEvents() {
         }
 
         if (m_showMainMenu) {
+            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                sf::Vector2f mousePos(static_cast<float>(event.mouseButton.x), static_cast<float>(event.mouseButton.y));
+                if (m_menuPanelOpen && m_musicSliderBounds.contains(mousePos)) {
+                    m_draggingVolumeSlider = true;
+                    setMusicVolumeFromMouse(mousePos.x);
+                }
+            }
+
+            if (event.type == sf::Event::MouseMoved && m_draggingVolumeSlider) {
+                setMusicVolumeFromMouse(static_cast<float>(event.mouseMove.x));
+            }
+
             if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mousePos(static_cast<float>(event.mouseButton.x), static_cast<float>(event.mouseButton.y));
-                if (m_playButtonBounds.contains(mousePos)) {
+                m_draggingVolumeSlider = false;
+
+                if (m_menuPanelOpen) {
+                    if (m_closeMenuPanelBounds.contains(mousePos)) {
+                        m_menuPanelOpen = false;
+                    } else if (m_musicSliderBounds.contains(mousePos)) {
+                        setMusicVolumeFromMouse(mousePos.x);
+                    } else if (m_rulesButtonBounds.contains(mousePos)) {
+                        m_menuPanelView = 1;
+                    } else if (m_creditsButtonBounds.contains(mousePos)) {
+                        m_menuPanelView = 2;
+                    }
+                } else if (m_menuButtonBounds.contains(mousePos)) {
+                    m_menuPanelOpen = true;
+                    m_menuPanelView = 0;
+                } else if (m_playButtonBounds.contains(mousePos)) {
                     m_showMainMenu = false;
+                    m_menuPanelOpen = false;
                     resetTurnTimer();
                     updateWindowTitle();
                 }
             }
 
             continue;
+        }
+
+        if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
+            sf::Vector2f mousePos(static_cast<float>(event.mouseButton.x), static_cast<float>(event.mouseButton.y));
+            if (m_restartButtonBounds.contains(mousePos)) {
+                restartMatch();
+                continue;
+            }
+
+            if (m_backToMenuButtonBounds.contains(mousePos)) {
+                m_isAiming = false;
+                m_showMainMenu = true;
+                m_menuPanelOpen = false;
+                m_menuPanelView = 0;
+                updateWindowTitle();
+                continue;
+            }
         }
 
 
@@ -1129,6 +1182,17 @@ m_cueSprite.setScale({0.5f, 0.5f});
         m_fruitCollisionSound.setVolume(55.0f);
     }
 
+    m_backgroundMusicLoaded =
+        openOptionalMusic(m_backgroundMusic, "assets/music/musica_fondo.ogg") ||
+        openOptionalMusic(m_backgroundMusic, "assets/music/musica.ogg") ||
+        openOptionalMusic(m_backgroundMusic, "assets/music/background_music.ogg") ||
+        openOptionalMusic(m_backgroundMusic, "assets/music/fondo.ogg");
+    if (m_backgroundMusicLoaded) {
+        m_backgroundMusic.setLoop(true);
+        m_backgroundMusic.setVolume(m_musicVolume);
+        m_backgroundMusic.play();
+    }
+
 
 
 }
@@ -1137,6 +1201,21 @@ m_cueSprite.setScale({0.5f, 0.5f});
 void Game::drawMainMenu() {
     m_window.clear(sf::Color(20, 80, 150));
     m_window.draw(m_menuSprite);
+
+    m_menuButtonBounds = sf::FloatRect(WINDOW_WIDTH - 88.0f, 28.0f, 54.0f, 44.0f);
+    sf::RectangleShape menuButton({m_menuButtonBounds.width, m_menuButtonBounds.height});
+    menuButton.setPosition({m_menuButtonBounds.left, m_menuButtonBounds.top});
+    menuButton.setFillColor(sf::Color(20, 28, 34, 205));
+    menuButton.setOutlineThickness(2.0f);
+    menuButton.setOutlineColor(sf::Color(178, 226, 178));
+    m_window.draw(menuButton);
+
+    for (int i = 0; i < 3; ++i) {
+        sf::RectangleShape line({28.0f, 4.0f});
+        line.setPosition({m_menuButtonBounds.left + 13.0f, m_menuButtonBounds.top + 11.0f + i * 10.0f});
+        line.setFillColor(sf::Color::White);
+        m_window.draw(line);
+    }
 
     const sf::Vector2f buttonSize(260.0f, 82.0f);
     const sf::Vector2f buttonPos(
@@ -1168,7 +1247,89 @@ void Game::drawMainMenu() {
         m_window.draw(playText);
     }
 
+    if (m_menuPanelOpen) {
+        drawCenteredMenuPanel();
+    }
+
     m_window.display();
+}
+
+
+void Game::drawCenteredMenuPanel() {
+    sf::RectangleShape shade({static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT)});
+    shade.setFillColor(sf::Color(0, 0, 0, 115));
+    m_window.draw(shade);
+
+    const sf::Vector2f panelSize(560.0f, 410.0f);
+    const sf::Vector2f panelPos(WINDOW_CENTER_X - panelSize.x * 0.5f, WINDOW_CENTER_Y - panelSize.y * 0.5f);
+    sf::RectangleShape panel(panelSize);
+    panel.setPosition(panelPos);
+    panel.setFillColor(sf::Color(24, 34, 38, 245));
+    panel.setOutlineThickness(3.0f);
+    panel.setOutlineColor(sf::Color(178, 226, 178));
+    m_window.draw(panel);
+
+    auto drawText = [&](const std::string& value, unsigned int size, sf::Vector2f pos, sf::Color color) {
+        if (!m_hudFontLoaded) {
+            return;
+        }
+
+        sf::Text text(value, m_hudFont, size);
+        text.setPosition(pos);
+        text.setFillColor(color);
+        text.setStyle(sf::Text::Bold);
+        m_window.draw(text);
+    };
+
+    drawText("Menu", 34, {panelPos.x + 32.0f, panelPos.y + 22.0f}, sf::Color::White);
+
+    m_closeMenuPanelBounds = sf::FloatRect(panelPos.x + panelSize.x - 58.0f, panelPos.y + 20.0f, 34.0f, 34.0f);
+    sf::RectangleShape closeButton({m_closeMenuPanelBounds.width, m_closeMenuPanelBounds.height});
+    closeButton.setPosition({m_closeMenuPanelBounds.left, m_closeMenuPanelBounds.top});
+    closeButton.setFillColor(sf::Color(178, 226, 178, 230));
+    m_window.draw(closeButton);
+    drawText("X", 22, {m_closeMenuPanelBounds.left + 9.0f, m_closeMenuPanelBounds.top + 3.0f}, sf::Color(18, 38, 28));
+
+    drawText("Volumen musica", 20, {panelPos.x + 42.0f, panelPos.y + 94.0f}, sf::Color(225, 236, 232));
+    m_musicSliderBounds = sf::FloatRect(panelPos.x + 42.0f, panelPos.y + 130.0f, 330.0f, 14.0f);
+    sf::RectangleShape sliderTrack({m_musicSliderBounds.width, m_musicSliderBounds.height});
+    sliderTrack.setPosition({m_musicSliderBounds.left, m_musicSliderBounds.top});
+    sliderTrack.setFillColor(sf::Color(85, 103, 96));
+    m_window.draw(sliderTrack);
+
+    float knobX = m_musicSliderBounds.left + (m_musicVolume / 100.0f) * m_musicSliderBounds.width;
+    sf::CircleShape knob(14.0f);
+    knob.setOrigin({14.0f, 14.0f});
+    knob.setPosition({knobX, m_musicSliderBounds.top + m_musicSliderBounds.height * 0.5f});
+    knob.setFillColor(sf::Color(178, 226, 178));
+    knob.setOutlineThickness(2.0f);
+    knob.setOutlineColor(sf::Color::White);
+    m_window.draw(knob);
+    drawText(std::to_string(static_cast<int>(m_musicVolume)) + "%", 18, {panelPos.x + 394.0f, panelPos.y + 120.0f}, sf::Color::White);
+
+    auto drawPanelButton = [&](sf::FloatRect& bounds, const std::string& label, sf::Vector2f pos) {
+        bounds = sf::FloatRect(pos.x, pos.y, 190.0f, 50.0f);
+        sf::RectangleShape button({bounds.width, bounds.height});
+        button.setPosition(pos);
+        button.setFillColor(sf::Color(178, 226, 178, 230));
+        button.setOutlineThickness(2.0f);
+        button.setOutlineColor(sf::Color(245, 210, 95));
+        m_window.draw(button);
+        drawText(label, 20, {pos.x + 22.0f, pos.y + 12.0f}, sf::Color(18, 38, 28));
+    };
+
+    drawPanelButton(m_rulesButtonBounds, "Reglas", {panelPos.x + 42.0f, panelPos.y + 178.0f});
+    drawPanelButton(m_creditsButtonBounds, "Creditos", {panelPos.x + 252.0f, panelPos.y + 178.0f});
+
+    if (m_menuPanelView == 1) {
+        drawText("Reglas", 22, {panelPos.x + 42.0f, panelPos.y + 254.0f}, sf::Color(178, 226, 178));
+        drawText("Emboca tu grupo, evita faltas y deja la sandia para el final.", 14, {panelPos.x + 42.0f, panelPos.y + 292.0f}, sf::Color::White);
+        drawText("Si se acaba el tiempo, el turno pasa al oponente.", 14, {panelPos.x + 42.0f, panelPos.y + 320.0f}, sf::Color::White);
+    } else if (m_menuPanelView == 2) {
+        drawText("Creditos", 22, {panelPos.x + 42.0f, panelPos.y + 254.0f}, sf::Color(178, 226, 178));
+        drawText("Fruit Pool", 14, {panelPos.x + 42.0f, panelPos.y + 292.0f}, sf::Color::White);
+        drawText("Desarrollo, arte y audio del equipo del proyecto.", 14, {panelPos.x + 42.0f, panelPos.y + 320.0f}, sf::Color::White);
+    }
 }
 
 
@@ -1187,6 +1348,20 @@ void Game::drawHUD() {
         text.setPosition(pos);
         text.setFillColor(color);
         text.setStyle(sf::Text::Bold);
+        m_window.draw(text);
+    };
+
+    auto drawCenteredText = [&](const std::string& value, unsigned int size, sf::Vector2f center, sf::Color color) {
+        if (!m_hudFontLoaded) {
+            return;
+        }
+
+        sf::Text text(value, m_hudFont, size);
+        text.setFillColor(color);
+        text.setStyle(sf::Text::Bold);
+        sf::FloatRect bounds = text.getLocalBounds();
+        text.setOrigin({bounds.left + bounds.width * 0.5f, bounds.top + bounds.height * 0.5f});
+        text.setPosition(center);
         m_window.draw(text);
     };
 
@@ -1225,24 +1400,71 @@ void Game::drawHUD() {
     drawPlayerPanel(0, {24.0f, 15.0f});
     drawPlayerPanel(1, {1036.0f, 15.0f});
 
-    sf::RectangleShape timerBox({230.0f, 74.0f});
-    timerBox.setPosition({625.0f, 22.0f});
+    const sf::Vector2f timerPos(625.0f, 22.0f);
+    const sf::Vector2f timerSize(230.0f, 74.0f);
+    const sf::Vector2f actionButtonSize(152.0f, 54.0f);
+    const float hudGap = 9.0f;
+
+    sf::RectangleShape timerBox(timerSize);
+    timerBox.setPosition(timerPos);
     timerBox.setFillColor(sf::Color(178, 226, 178, 235));
     timerBox.setOutlineThickness(2.0f);
     timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : sf::Color(245, 210, 95));
     m_window.draw(timerBox);
 
-    drawText("Turno J" + std::to_string(m_currentPlayer + 1), 18, {666.0f, 30.0f}, sf::Color(28, 52, 38));
+    drawCenteredText("Turno Jugador " + std::to_string(m_currentPlayer + 1), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, sf::Color(28, 52, 38));
     int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
-    drawText(std::to_string(seconds) + "s", 34, {704.0f, 54.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(185, 40, 34) : sf::Color(18, 38, 28));
+    drawCenteredText(std::to_string(seconds) + "s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(185, 40, 34) : sf::Color(18, 38, 28));
 
-    drawText(m_statusMessage, 12, {540.0f, 100.0f}, sf::Color(225, 236, 232));//
+    m_restartButtonBounds = sf::FloatRect(timerPos.x - hudGap - actionButtonSize.x, 32.0f, actionButtonSize.x, actionButtonSize.y);
+    sf::RectangleShape restartButton({m_restartButtonBounds.width, m_restartButtonBounds.height});
+    restartButton.setPosition({m_restartButtonBounds.left, m_restartButtonBounds.top});
+    restartButton.setFillColor(sf::Color(178, 226, 178, 235));
+    restartButton.setOutlineThickness(2.0f);
+    restartButton.setOutlineColor(sf::Color(245, 210, 95));
+    m_window.draw(restartButton);
+    drawCenteredText("Reiniciar", 18, {m_restartButtonBounds.left + m_restartButtonBounds.width * 0.5f, m_restartButtonBounds.top + m_restartButtonBounds.height * 0.5f}, sf::Color(18, 38, 28));
+
+    m_backToMenuButtonBounds = sf::FloatRect(timerPos.x + timerSize.x + hudGap, 32.0f, actionButtonSize.x, actionButtonSize.y);
+    sf::RectangleShape backButton({m_backToMenuButtonBounds.width, m_backToMenuButtonBounds.height});
+    backButton.setPosition({m_backToMenuButtonBounds.left, m_backToMenuButtonBounds.top});
+    backButton.setFillColor(sf::Color(178, 226, 178, 235));
+    backButton.setOutlineThickness(2.0f);
+    backButton.setOutlineColor(sf::Color(245, 210, 95));
+    m_window.draw(backButton);
+    drawCenteredText("Menu", 20, {m_backToMenuButtonBounds.left + m_backToMenuButtonBounds.width * 0.5f, m_backToMenuButtonBounds.top + m_backToMenuButtonBounds.height * 0.5f}, sf::Color(18, 38, 28));
+
+    drawCenteredText(m_statusMessage, 12, {timerPos.x + timerSize.x * 0.5f, 105.0f}, sf::Color(225, 236, 232));//
 }
 
 
 void Game::resetTurnTimer() {
     m_turnTimeRemaining = 30.0f;
     m_turnClock.restart();
+}
+
+
+void Game::restartMatch() {
+    m_isAiming = false;
+    m_phase = GamePhase::AIMING;
+    m_currentPlayer = 0;
+    m_isPlayer1Turn = true;
+    m_winner = -1;
+    m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
+    m_cueBallPocketedThisShot = false;
+    m_eightBallPocketedThisShot = false;
+    m_shotPocketedGroups.clear();
+
+    for (Fruit& fruit : m_fruits) {
+        b2DestroyBody(fruit.bodyId);
+    }
+    m_fruits.clear();
+
+    resetCueBall();
+    spawnTriangle();
+    resetTurnTimer();
+    m_statusMessage = "Mesa abierta";
+    updateWindowTitle();
 }
 
 
@@ -1259,8 +1481,22 @@ void Game::updateTurnTimer() {
 
     m_isAiming = false;
     switchTurn();
-    m_statusMessage = "Tiempo agotado. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+    m_statusMessage = "Tiempo agotado";
     updateWindowTitle();
+}
+
+
+void Game::setMusicVolumeFromMouse(float mouseX) {
+    if (m_musicSliderBounds.width <= 0.0f) {
+        return;
+    }
+
+    float relative = (mouseX - m_musicSliderBounds.left) / m_musicSliderBounds.width;
+    relative = std::max(0.0f, std::min(1.0f, relative));
+    m_musicVolume = relative * 100.0f;
+    if (m_backgroundMusicLoaded) {
+        m_backgroundMusic.setVolume(m_musicVolume);
+    }
 }
 
 
@@ -1623,13 +1859,13 @@ void Game::resolveShotIfReady() {
 
     if (m_cueBallPocketedThisShot) {
         switchTurn();
-        m_statusMessage = "Falta: cayo el coco. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+        m_statusMessage = "Falta: cayo el coco";
     } else if (!pocketedOwnGroup) {
         switchTurn();
-        m_statusMessage = "No emboco fruta propia. Turno del Jugador " + std::to_string(m_currentPlayer + 1);
+        m_statusMessage = "No emboco fruta propia";
     } else {
         resetTurnTimer();
-        m_statusMessage = "Jugador " + std::to_string(m_currentPlayer + 1) + " sigue tirando.";
+        m_statusMessage = "Sigue tirando";
     }
 
     m_cueBallPocketedThisShot = false;
