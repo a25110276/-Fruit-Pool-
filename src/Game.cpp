@@ -789,11 +789,14 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
             const float ringRadius = 15.0f;
             const float ringThickness = 2.0f;
             const float shortGuideLength = 28.0f;
+            const float reboundLineLength = 40.0f;
 
             sf::Vector2f ghostCenter = fruitCenter - fruitDirection * (fruitRadiusPixels + ringRadius);
             sf::Vector2f guideStart = fruitCenter + fruitDirection * (fruitRadiusPixels + 2.0f);
             sf::Vector2f guideEnd = guideStart + fruitDirection * shortGuideLength;
             float guideAngle = std::atan2(fruitDirection.y, fruitDirection.x) * 180.0f / 3.14159265f;
+            sf::Vector2f cueReboundDir = normalize(aimDir - fruitDirection * dot(aimDir, fruitDirection));
+            float reboundLenSq = dot(cueReboundDir, cueReboundDir);
 
             sf::CircleShape impactRing(ringRadius);
             impactRing.setOrigin({ringRadius, ringRadius});
@@ -815,6 +818,15 @@ if (m_isAiming && m_phase == GamePhase::AIMING) {
             fruitPathEnd.setPosition(guideEnd);
             fruitPathEnd.setFillColor(sf::Color(255, 150, 60, 220));
             m_window.draw(fruitPathEnd);
+
+            if (reboundLenSq > 0.0001f) {
+                sf::RectangleShape reboundLine({reboundLineLength, 3.0f});
+                reboundLine.setOrigin({0.0f, 1.5f});
+                reboundLine.setPosition(ghostCenter);
+                reboundLine.setRotation(std::atan2(cueReboundDir.y, cueReboundDir.x) * 180.0f / 3.14159265f);
+                reboundLine.setFillColor(sf::Color(255, 255, 255, 150));
+                m_window.draw(reboundLine);
+            }
         }
 
 
