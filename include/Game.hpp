@@ -146,6 +146,7 @@ void drawHUD();
 void drawCenteredMenuPanel();
 void updateAnimation();
 void updateTurnTimer();
+void updateAI();
 void setMusicVolumeFromMouse(float mouseX);
 void playCueHitSound();
 void playCueStretchSound();
@@ -158,13 +159,17 @@ bool areBallsStopped() const;
 bool hasClearedGroup(int playerIndex) const;
 void switchTurn();
 void resetTurnTimer();
+void startMatch(bool versusAI);
 void restartMatch();
 void randomizeAvatars();
 void assignGroups(FruitGroup pocketedGroup);
 void resetCueBall();
 FruitGroup getFruitGroup(FruitType type) const;
 std::string getGroupName(FruitGroup group) const;
+std::string getPlayerName(int playerIndex) const;
 void updateWindowTitle();
+bool isAITurn() const;
+void performAIShot();
 
 
     // --- Ayudas de apuntado y predicción ---
@@ -188,6 +193,7 @@ void updateWindowTitle();
     bool m_draggingVolumeSlider = false;
     int m_menuPanelView = 0;
     sf::FloatRect m_playButtonBounds;
+    sf::FloatRect m_aiButtonBounds;
     sf::FloatRect m_menuButtonBounds;
     sf::FloatRect m_closeMenuPanelBounds;
     sf::FloatRect m_musicSliderBounds;
@@ -198,6 +204,8 @@ void updateWindowTitle();
     GamePhase m_phase = GamePhase::AIMING;
     int m_currentPlayer = 0;
     bool m_isPlayer1Turn = true;
+    bool m_vsAI = false;
+    bool m_aiShotPending = false;
     int m_winner = -1;
     std::array<FruitGroup, 2> m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
     bool m_cueBallPocketedThisShot = false;
@@ -214,6 +222,7 @@ void updateWindowTitle();
     std::array<std::size_t, 2> m_playerAvatarIndex = {0, 0};
     std::array<int, 2> m_playerWins = {0, 0};
     sf::Clock m_turnClock;
+    sf::Clock m_aiThinkClock;
     float m_turnTimeRemaining = 30.0f;
 
     // --- Fase 8: Audio ---

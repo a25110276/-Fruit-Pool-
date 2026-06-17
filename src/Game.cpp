@@ -51,6 +51,10 @@ static bool openOptionalMusic(sf::Music& music, const std::string& path) {
     return music.openFromFile(path);
 }
 
+static float vectorLength(const sf::Vector2f& vector) {
+    return std::sqrt(vector.x * vector.x + vector.y * vector.y);
+}
+
 
 // NOTA: Este código asume que tienes las imágenes "mantel.jpg", "coco.png" y "taco.png" en la carpeta "assets/images/" de tu proyecto.
 Game::Game() : m_window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fruit Pool - Fase 8") {
@@ -444,15 +448,9 @@ void Game::processEvents() {
                     m_menuPanelOpen = true;
                     m_menuPanelView = 0;
                 } else if (m_playButtonBounds.contains(mousePos)) {
-                    m_showMainMenu = false;
-                    m_menuPanelOpen = false;
-                    if (!m_hasStartedMatch) {
-                        resetTurnTimer();
-                        m_hasStartedMatch = true;
-                    } else {
-                        m_turnClock.restart();
-                    }
-                    updateWindowTitle();
+                    startMatch(false);
+                } else if (m_aiButtonBounds.contains(mousePos)) {
+                    startMatch(true);
                 }
             }
 
@@ -471,6 +469,7 @@ void Game::processEvents() {
                 m_showMainMenu = true;
                 m_menuPanelOpen = false;
                 m_menuPanelView = 0;
+                m_aiShotPending = false;
                 m_turnClock.restart();
                 updateWindowTitle();
                 continue;
@@ -480,7 +479,7 @@ void Game::processEvents() {
 
         // Evento: Jugador hace Click Izquierdo (Empieza a apuntar/cargar fuerza)
         if (event.type == sf::Event::MouseButtonPressed) {
-            if (event.mouseButton.button == sf::Mouse::Left && m_phase == GamePhase::AIMING && areBallsStopped()) {
+            if (event.mouseButton.button == sf::Mouse::Left && m_phase == GamePhase::AIMING && areBallsStopped() && !isAITurn()) {
                 m_isAiming = true;
                 playCueStretchSound();
                 // Guardamos el punto exacto donde hizo click
@@ -540,6 +539,7 @@ void Game::update() {
     checkWallBounceAudio();
     checkPockets();
     resolveShotIfReady();
+    updateAI();
     updateTurnTimer();
     
 }
@@ -1284,9 +1284,11 @@ void Game::drawMainMenu() {
     const sf::Vector2f buttonSize(260.0f, 82.0f);
     const sf::Vector2f buttonPos(
         WINDOW_CENTER_X - buttonSize.x * 0.5f,
-        WINDOW_CENTER_Y - buttonSize.y * 0.5f + 200.0f
+        WINDOW_CENTER_Y - buttonSize.y * 0.5f + 190.0f
     );
     m_playButtonBounds = sf::FloatRect(buttonPos.x, buttonPos.y, buttonSize.x, buttonSize.y);
+    const sf::Vector2f aiButtonPos(buttonPos.x, buttonPos.y + buttonSize.y + 18.0f);
+    m_aiButtonBounds = sf::FloatRect(aiButtonPos.x, aiButtonPos.y, buttonSize.x, buttonSize.y);
 
     sf::RectangleShape playButton(buttonSize);
     playButton.setPosition(buttonPos);
@@ -1309,6 +1311,29 @@ void Game::drawMainMenu() {
             buttonPos.y + buttonSize.y * 0.5f - 2.0f
         });
         m_window.draw(playText);
+    }
+
+    sf::RectangleShape aiButton(buttonSize);
+    aiButton.setPosition(aiButtonPos);
+    aiButton.setFillColor(sf::Color(178, 226, 178, 235));
+    aiButton.setOutlineThickness(3.0f);
+    aiButton.setOutlineColor(sf::Color(0, 210, 0));
+    m_window.draw(aiButton);
+
+    if (m_hudFontLoaded) {
+        sf::Text aiText("MAQUINA", m_hudFont, 34);
+        aiText.setStyle(sf::Text::Bold);
+        aiText.setFillColor(sf::Color(255, 255, 255));
+        sf::FloatRect textBounds = aiText.getLocalBounds();
+        aiText.setOrigin({
+            textBounds.left + textBounds.width * 0.5f,
+            textBounds.top + textBounds.height * 0.5f
+        });
+        aiText.setPosition({
+            aiButtonPos.x + buttonSize.x * 0.5f,
+            aiButtonPos.y + buttonSize.y * 0.5f - 2.0f
+        });
+        m_window.draw(aiText);
     }
 
     if (m_menuPanelOpen) {
@@ -1497,7 +1522,7 @@ void Game::drawHUD() {
             }
         }
 
-        drawText("Jugador " + std::to_string(playerIndex + 1), 16, {pos.x + 98.0f, pos.y + 58.0f}, sf::Color::White);
+        drawText(getPlayerName(playerIndex), 16, {pos.x + 98.0f, pos.y + 58.0f}, sf::Color::White);
         drawText("Victorias: " + std::to_string(m_playerWins[playerIndex]), 14, {pos.x + 205.0f, pos.y + 60.0f}, sf::Color(220, 230, 230));
         drawText(getGroupName(m_playerGroups[playerIndex]), 14, {pos.x + 326.0f, pos.y + 60.0f}, hudGreen); 
     };
@@ -1517,7 +1542,7 @@ void Game::drawHUD() {
     timerBox.setOutlineColor(m_turnTimeRemaining <= 5.0f ? sf::Color(235, 85, 70) : hudGreen);
     m_window.draw(timerBox);
 
-    drawCenteredText("Turno Jugador " + std::to_string(m_currentPlayer + 1), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, hudGreen);
+    drawCenteredText("Turno " + getPlayerName(m_currentPlayer), 16, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 20.0f}, hudGreen);
     int seconds = std::max(0, static_cast<int>(std::ceil(m_turnTimeRemaining)));
     drawCenteredText(std::to_string(seconds) + " s", 34, {timerPos.x + timerSize.x * 0.5f, timerPos.y + 51.0f}, m_turnTimeRemaining <= 5.0f ? sf::Color(255, 120, 105) : sf::Color::White);
 
@@ -1570,6 +1595,28 @@ void Game::randomizeAvatars() {
 }
 
 
+void Game::startMatch(bool versusAI) {
+    bool modeChanged = m_hasStartedMatch && (m_vsAI != versusAI);
+    m_vsAI = versusAI;
+    m_showMainMenu = false;
+    m_menuPanelOpen = false;
+    m_aiShotPending = false;
+    m_aiThinkClock.restart();
+
+    if (!m_hasStartedMatch) {
+        resetTurnTimer();
+        m_hasStartedMatch = true;
+        m_statusMessage = m_vsAI ? "Jugador 1: turno contra Maquina" : "Jugador 1: Mesa abierta";
+    } else if (modeChanged) {
+        restartMatch();
+    } else {
+        m_turnClock.restart();
+    }
+
+    updateWindowTitle();
+}
+
+
 void Game::restartMatch() {
     m_isAiming = false;
     m_phase = GamePhase::AIMING;
@@ -1579,6 +1626,7 @@ void Game::restartMatch() {
     m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
     m_cueBallPocketedThisShot = false;
     m_eightBallPocketedThisShot = false;
+    m_aiShotPending = false;
     m_shotPocketedGroups.clear();
     m_shotPocketedFruits.clear();
     m_playerPocketedFruits[0].clear();
@@ -1593,7 +1641,8 @@ void Game::restartMatch() {
     resetCueBall();
     spawnTriangle();
     resetTurnTimer();
-    m_statusMessage = "Jugador 1: Mesa abierta";
+    m_aiThinkClock.restart();
+    m_statusMessage = m_vsAI ? "Jugador 1: turno contra Maquina" : "Jugador 1: Mesa abierta";
     updateWindowTitle();
 }
 
@@ -1612,8 +1661,154 @@ void Game::updateTurnTimer() {
     int timedOutPlayer = m_currentPlayer;
     m_isAiming = false;
     switchTurn();
-    m_statusMessage = "Jugador " + std::to_string(timedOutPlayer + 1) + ": tiempo agotado";
+    m_statusMessage = getPlayerName(timedOutPlayer) + ": tiempo agotado";
     updateWindowTitle();
+}
+
+
+void Game::updateAI() {
+    if (!isAITurn()) {
+        if (!m_vsAI || m_currentPlayer == 0) {
+            m_aiShotPending = false;
+        }
+        return;
+    }
+
+    if (!m_aiShotPending) {
+        m_aiShotPending = true;
+        m_aiThinkClock.restart();
+        m_statusMessage = "Maquina: calculando tiro";
+        updateWindowTitle();
+        return;
+    }
+
+    if (m_aiThinkClock.getElapsedTime().asSeconds() < 0.75f) {
+        return;
+    }
+
+    performAIShot();
+    m_aiShotPending = false;
+}
+
+
+void Game::performAIShot() {
+    if (m_fruits.empty()) {
+        return;
+    }
+
+    b2Vec2 cueBodyPos = b2Body_GetPosition(m_cueBallId);
+    sf::Vector2f cuePos(cueBodyPos.x * SCALE, cueBodyPos.y * SCALE);
+    FruitGroup aiGroup = m_playerGroups[1];
+    bool canShootEight = hasClearedGroup(1);
+
+    bool foundShot = false;
+    float bestScore = -std::numeric_limits<float>::infinity();
+    sf::Vector2f bestDirection(1.0f, 0.0f);
+    float bestPower = 46.0f;
+
+    auto isEligibleTarget = [&](FruitType type) {
+        if (type == SANDIA) {
+            return canShootEight;
+        }
+
+        FruitGroup group = getFruitGroup(type);
+        return aiGroup == FruitGroup::NONE || group == aiGroup;
+    };
+
+    for (const Fruit& fruit : m_fruits) {
+        if (!isEligibleTarget(fruit.type)) {
+            continue;
+        }
+
+        b2Vec2 fruitBodyPos = b2Body_GetPosition(fruit.bodyId);
+        sf::Vector2f fruitCenter(fruitBodyPos.x * SCALE, fruitBodyPos.y * SCALE);
+
+        for (const b2Vec2& pocket : m_pockets) {
+            sf::Vector2f pocketPos(pocket.x * SCALE, pocket.y * SCALE);
+            sf::Vector2f fruitToPocket = pocketPos - fruitCenter;
+            float fruitToPocketDistance = vectorLength(fruitToPocket);
+            if (fruitToPocketDistance < 1.0f) {
+                continue;
+            }
+
+            fruitToPocket = normalize(fruitToPocket);
+            sf::Vector2f ghostCuePos = fruitCenter - fruitToPocket * 30.0f;
+            sf::Vector2f cueToGhost = ghostCuePos - cuePos;
+            float cueDistance = vectorLength(cueToGhost);
+            if (cueDistance < 10.0f) {
+                continue;
+            }
+
+            sf::Vector2f shotDirection = normalize(cueToGhost);
+            sf::Vector2f collisionPoint;
+            sf::Vector2f predictedFruitCenter;
+            sf::Vector2f fruitDirection;
+            b2BodyId hitId;
+            bool hasCollision = predictBallCollision(
+                cuePos,
+                shotDirection,
+                collisionPoint,
+                predictedFruitCenter,
+                fruitDirection,
+                hitId
+            );
+
+            if (!hasCollision || !B2_ID_EQUALS(hitId, fruit.bodyId)) {
+                continue;
+            }
+
+            float alignment = dot(fruitDirection, fruitToPocket);
+            if (alignment < 0.72f) {
+                continue;
+            }
+
+            float score = alignment * 1000.0f - cueDistance * 0.16f - fruitToPocketDistance * 0.08f;
+            if (score > bestScore) {
+                foundShot = true;
+                bestScore = score;
+                bestDirection = shotDirection;
+                bestPower = std::max(28.0f, std::min(78.0f, (cueDistance + fruitToPocketDistance) * 0.055f));
+            }
+        }
+    }
+
+    if (!foundShot) {
+        float nearestDistance = std::numeric_limits<float>::infinity();
+        for (const Fruit& fruit : m_fruits) {
+            if (!isEligibleTarget(fruit.type) && fruit.type != SANDIA) {
+                continue;
+            }
+
+            b2Vec2 fruitBodyPos = b2Body_GetPosition(fruit.bodyId);
+            sf::Vector2f fruitCenter(fruitBodyPos.x * SCALE, fruitBodyPos.y * SCALE);
+            sf::Vector2f cueToFruit = fruitCenter - cuePos;
+            float distance = vectorLength(cueToFruit);
+            if (distance < nearestDistance && distance > 1.0f) {
+                nearestDistance = distance;
+                bestDirection = normalize(cueToFruit);
+                bestPower = 48.0f;
+                foundShot = true;
+            }
+        }
+    }
+
+    if (!foundShot) {
+        bestDirection = {1.0f, 0.0f};
+        bestPower = 42.0f;
+    }
+
+    m_isAiming = false;
+    m_phase = GamePhase::BALLS_MOVING;
+    m_cueBallPocketedThisShot = false;
+    m_eightBallPocketedThisShot = false;
+    m_shotPocketedGroups.clear();
+    m_shotPocketedFruits.clear();
+    m_statusMessage = "Maquina: tiro realizado";
+    playCueHitSound();
+    updateWindowTitle();
+
+    b2Vec2 impulse = {bestDirection.x * bestPower, bestDirection.y * bestPower};
+    b2Body_ApplyLinearImpulse(m_cueBallId, impulse, cueBodyPos, true);
 }
 
 
@@ -1958,6 +2153,20 @@ std::string Game::getGroupName(FruitGroup group) const {
 }
 
 
+std::string Game::getPlayerName(int playerIndex) const {
+    if (m_vsAI && playerIndex == 1) {
+        return "Maquina";
+    }
+
+    return "Jugador " + std::to_string(playerIndex + 1);
+}
+
+
+bool Game::isAITurn() const {
+    return m_vsAI && m_currentPlayer == 1 && m_phase == GamePhase::AIMING && areBallsStopped();
+}
+
+
 bool Game::areBallsStopped() const {
     const float stopSpeed = 0.08f;
     b2Vec2 cueVelocity = b2Body_GetLinearVelocity(m_cueBallId);
@@ -2032,7 +2241,7 @@ void Game::resolveShotIfReady() {
         m_playerWins[m_winner]++;
         int roundWinner = m_winner;
         restartMatch();
-        m_statusMessage = "Jugador " + std::to_string(roundWinner + 1) + ": gano la ronda";
+        m_statusMessage = getPlayerName(roundWinner) + ": gano la ronda";
         updateWindowTitle();
         return;
     }
@@ -2063,13 +2272,13 @@ void Game::resolveShotIfReady() {
 
     if (m_cueBallPocketedThisShot) {
         switchTurn();
-        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": falta, cayo el coco";
+        m_statusMessage = getPlayerName(shooter) + ": falta, cayo el coco";
     } else if (!pocketedOwnGroup) {
         switchTurn();
-        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": no emboco fruta propia";
+        m_statusMessage = getPlayerName(shooter) + ": no emboco fruta propia";
     } else {
         resetTurnTimer();
-        m_statusMessage = "Jugador " + std::to_string(shooter + 1) + ": sigue tirando";
+        m_statusMessage = getPlayerName(shooter) + ": sigue tirando";
     }
 
     m_cueBallPocketedThisShot = false;
@@ -2086,11 +2295,11 @@ void Game::updateWindowTitle() {
     title << "Fruit Pool - Fase 8 | ";
 
     if (m_phase == GamePhase::GAME_OVER) {
-        title << "Gana Jugador " << (m_winner + 1);
+        title << "Gana " << getPlayerName(m_winner);
     } else {
-        title << "Turno Jugador " << (m_currentPlayer + 1);
-        title << " | J1: " << getGroupName(m_playerGroups[0]);
-        title << " | J2: " << getGroupName(m_playerGroups[1]);
+        title << "Turno " << getPlayerName(m_currentPlayer);
+        title << " | " << getPlayerName(0) << ": " << getGroupName(m_playerGroups[0]);
+        title << " | " << getPlayerName(1) << ": " << getGroupName(m_playerGroups[1]);
         if (m_phase == GamePhase::BALLS_MOVING) {
             title << " | bolas en movimiento";
         }
