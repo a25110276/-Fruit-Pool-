@@ -1,16 +1,14 @@
 
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <SFML/Audio.hpp>
 #include <box2d/box2d.h>
-#include <array>
 #include <vector>
 #include <map>
-#include <string>
 
 
 // Enumeración de tipos de frutas
 enum FruitType {
+    
     SANDIA,       // Bola 8
     LIMA,         // Rallada
     LIMON,        // Rallada
@@ -28,6 +26,7 @@ enum FruitType {
     MORA_AZUL     // Lisa
 };
 
+
 // Estructura para información de spritesheet de una fruta
 struct FruitSpriteInfo {
     int frameWidth;
@@ -36,14 +35,15 @@ struct FruitSpriteInfo {
     int columns;
 };
 
+
 // Estructura para una fruta en el juego
 struct Fruit {
     b2BodyId bodyId;
     FruitType type;
     sf::Sprite sprite;
-    int currentFrame = 0;
-    float frameTime = 0.1f;
+    sf::Texture texture;
 };
+
 
 class Game {
 public:
@@ -53,23 +53,12 @@ public:
 
 
 private:
-    enum class FruitGroup {
-        NONE,
-        SOLID,
-        STRIPED
-    };
-
-    enum class GamePhase {
-        AIMING,
-        BALLS_MOVING,
-        GAME_OVER
-    };
-
     void processEvents();
     void update();
     void render();
     void initPhysics();
 
+    
 
     // --- Variables de Troneras ---
 std::vector<b2Vec2> m_pockets;
@@ -109,8 +98,6 @@ void spawnTriangle();
 // --- Assets Visuales ---
 sf::Texture m_backgroundTexture;
 sf::Sprite m_backgroundSprite;
-sf::Texture m_menuTexture;
-sf::Sprite m_menuSprite;
 sf::Texture m_frameTexture;
 sf::Sprite m_frameSprite;
 sf::Texture m_tableTexture;
@@ -123,12 +110,14 @@ sf::Sprite m_cocoSprite;
 sf::Texture m_cueTexture;
 sf::Sprite m_cueSprite;
 
+
 // --- Assets de Frutas ---
 std::map<FruitType, sf::Texture> m_fruitTextures;
 
+
 // --- Lógica de Animación ---
 int m_currentFrame = 0;
-float m_frameTime = 0.1f;
+float m_frameTime = 0.0f;
 sf::Clock m_animClock;
 
 
@@ -141,35 +130,7 @@ const int COLUMNS = 7;        // 700 px totales / 100 px por frame
 
 // Nuevas funciones
 void loadAssets();
-void drawMainMenu();
-void drawHUD();
-void drawCenteredMenuPanel();
 void updateAnimation();
-void updateTurnTimer();
-void updateAI();
-void setMusicVolumeFromMouse(float mouseX);
-void playCueHitSound();
-void playCueStretchSound();
-void playFruitCollisionSound();
-void playWallBounceSound();
-void checkCollisionAudio();
-void checkWallBounceAudio();
-void resolveShotIfReady();
-bool areBallsStopped() const;
-bool hasClearedGroup(int playerIndex) const;
-void switchTurn();
-void resetTurnTimer();
-void startMatch(bool versusAI);
-void restartMatch();
-void randomizeAvatars();
-void assignGroups(FruitGroup pocketedGroup);
-void resetCueBall();
-FruitGroup getFruitGroup(FruitType type) const;
-std::string getGroupName(FruitGroup group) const;
-std::string getPlayerName(int playerIndex) const;
-void updateWindowTitle();
-bool isAITurn() const;
-void performAIShot();
 
 
     // --- Ayudas de apuntado y predicción ---
@@ -178,69 +139,7 @@ void performAIShot();
     bool predictBallCollision(const sf::Vector2f& origin,
                               const sf::Vector2f& direction,
                               sf::Vector2f& collisionPoint,
-                              sf::Vector2f& fruitCenter,
                               sf::Vector2f& reboundDir,
                               b2BodyId& hitId) const;
-    bool predictWallCollision(const sf::Vector2f& origin,
-                              const sf::Vector2f& direction,
-                              sf::Vector2f& collisionPoint) const;
     std::vector<std::pair<sf::Vector2f, sf::Vector2f>> predictTrajectory(const sf::Vector2f& origin, const sf::Vector2f& direction, int maxBounces = 5) const;
-
-    // --- Fase 7: Reglas y maquina de estados ---
-    bool m_showMainMenu = true;
-    bool m_hasStartedMatch = false;
-    bool m_menuPanelOpen = false;
-    bool m_draggingVolumeSlider = false;
-    int m_menuPanelView = 0;
-    sf::FloatRect m_playButtonBounds;
-    sf::FloatRect m_aiButtonBounds;
-    sf::FloatRect m_menuButtonBounds;
-    sf::FloatRect m_closeMenuPanelBounds;
-    sf::FloatRect m_musicSliderBounds;
-    sf::FloatRect m_rulesButtonBounds;
-    sf::FloatRect m_creditsButtonBounds;
-    sf::FloatRect m_restartButtonBounds;
-    sf::FloatRect m_backToMenuButtonBounds;
-    GamePhase m_phase = GamePhase::AIMING;
-    int m_currentPlayer = 0;
-    bool m_isPlayer1Turn = true;
-    bool m_vsAI = false;
-    bool m_aiShotPending = false;
-    int m_winner = -1;
-    std::array<FruitGroup, 2> m_playerGroups = {FruitGroup::NONE, FruitGroup::NONE};
-    bool m_cueBallPocketedThisShot = false;
-    bool m_eightBallPocketedThisShot = false;
-    std::vector<FruitGroup> m_shotPocketedGroups;
-    std::vector<FruitType> m_shotPocketedFruits;
-    std::array<std::vector<FruitType>, 2> m_playerPocketedFruits;
-    std::string m_statusMessage = "Jugador 1: Mesa abierta";
-
-    // --- Fase 8: HUD ---
-    sf::Font m_hudFont;
-    bool m_hudFontLoaded = false;
-    std::vector<sf::Texture> m_avatarTextures;
-    std::array<std::size_t, 2> m_playerAvatarIndex = {0, 0};
-    std::array<int, 2> m_playerWins = {0, 0};
-    sf::Clock m_turnClock;
-    sf::Clock m_aiThinkClock;
-    float m_turnTimeRemaining = 30.0f;
-
-    // --- Fase 8: Audio ---
-    sf::SoundBuffer m_cueHitBuffer;
-    sf::SoundBuffer m_fruitCollisionBuffer;
-    sf::SoundBuffer m_wallBounceBuffer;
-    sf::SoundBuffer m_cueStretchBuffer;
-    sf::Sound m_cueHitSound;
-    sf::Sound m_fruitCollisionSound;
-    sf::Sound m_wallBounceSound;
-    sf::Sound m_cueStretchSound;
-    sf::Music m_backgroundMusic;
-    bool m_cueHitLoaded = false;
-    bool m_fruitCollisionLoaded = false;
-    bool m_wallBounceLoaded = false;
-    bool m_cueStretchLoaded = false;
-    bool m_backgroundMusicLoaded = false;
-    float m_musicVolume = 45.0f;
-    sf::Clock m_collisionSoundClock;
-    sf::Clock m_wallBounceSoundClock;
 };
