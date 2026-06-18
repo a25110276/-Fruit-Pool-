@@ -1,0 +1,128 @@
+name: Publicar en Galería CETUS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🔢 Generar versión
+        id: version
+        run: |
+          VERSION="v1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Versión generada: $VERSION"
+
+      - name: 📦 Empaquetar ejecutable
+        run: |
+          echo "Empaquetando bin/ y assets/ en un ZIP..."
+          mkdir -p release-package
+
+          # Copiar ejecutable
+          if [ -d "bin" ]; then
+            cp -r bin/* release-package/ 2>/dev/null || echo "⚠️ Carpeta bin/ vacía o no existe"
+          fi
+
+          # Copiar assets
+          if [ -d "assets" ]; then
+            cp -r assets release-package/ 2>/dev/null || echo "⚠️ Carpeta assets/ vacía o no existe"
+          fi
+
+          # Crear ZIP
+          cd release-package
+          zip -r ../FRUIT.zip . || echo "⚠️ Error al crear ZIP"
+          cd ..
+
+          # Mostrar tamaño
+          SIZE=$(du -h FRUIT.zip | cut -f1)
+          echo "✅ ZIP creado: $SIZE"
+
+      - name: 🚀 Crear Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+        
+            ## Fruit Pool - Release ${{ steps.version.outputs.version }}
+
+            **Commit:** ${{ github.sha }}
+            **Autor:** ${{ github.event.head_commit.author.name }}
+            **Fecha:** ${{ github.event.head_commit.timestamp }}
+
+            ### 📝 Mensaje del Commit
+            ${{ github.event.head_commit.message }}
+
+            ### 📦 Contenido
+            - Ejecutable del juego
+            - Assets necesarios
+
+            ### ⬇️ Descarga
+            Descarga `FRUIT.zip` para jugar.
+          draft: false
+          prerelease: false
+          files: |
+            FRUIT.zip
+
+      - name: 📡 Notificar a CETUS
+        run: |
+          echo "🔔 Enviando notificación a CETUS..."
+
+          RELEASE_URL="${{ steps.create_release.outputs.url }}"
+
+          # Construir payload JSON
+          cat > payload.json <<EOF
+          {
+            "action": "published",
+            "repository": {
+              "full_name": "${{ github.repository }}",
+              "html_url": "${{ github.event.repository.html_url }}"
+            },
+            "release": {
+              "tag_name": "${{ steps.version.outputs.version }}",
+              "html_url": "$RELEASE_URL",
+              "target_commitish": "${{ github.sha }}",
+              "assets": [
+                {
+                  "name": "FRUIT.zip",
+                  "browser_download_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/juego-proyecto-252.zip",
+                  "size": $(stat -c%s FRUIT.zip)
+                }
+              ]
+            }
+          }
+          EOF
+
+          # Enviar webhook a CETUS (sin autenticación para simplicidad)
+          curl -X POST https://cetus.logiasimbolica.com/api/webhook/github \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: release" \
+            -d @payload.json \
+            -w "\n📊 Status: %{http_code}\n" \
+            || echo "⚠️ Error al notificar a CETUS (el proyecto aún se puede ver en GitHub Releases)"
+
+          echo "✅ Proceso completado"
+
+      - name: 📋 Resumen
+        run: |
+          echo "## 🎉 Publicación Exitosa" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release:** [Ver en GitHub](${{ steps.create_release.outputs.url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Descarga:** [juego-proyecto-252.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/juego-proyecto-252.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tu proyecto se actualizará en la galería CETUS en unos momentos." >> $GITHUB_STEP_SUMMARY
